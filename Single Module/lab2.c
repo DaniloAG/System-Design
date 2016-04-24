@@ -2,23 +2,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <ctype.h>
-#include <setjmp.h>
 #include <signal.h>
-#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/mman.h>
 #include <errno.h>
-#include <math.h>
-#include <pthread.h>
-#include <semaphore.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 #define MAXARGS 128
 #define	MAXLINE	 8192
@@ -59,16 +46,27 @@ void eval(char *cmdline){
 	 			exit(0);
 	 		}
  		}
- 		/* Parent waits for foreground job to terminate */
- 		if (!bg) {
+ 		else{
  			int status;
- 			if (waitpid(pid, &status, 0) < 0){
- 				fprintf(stderr, "%s: %s\n", "waitfg: waitpid error", strerror(errno));
-    			exit(0);
- 			}
+ 			waitpid(pid, &status, 0);
+ 			// if (WIFEXITED(status)){
+ 			// 	printf("Child Terminated");
+ 			// }
  		}
- 		else
+
+ 		if (bg){
  			printf("%d %s", pid, cmdline);
+ 		}
+ 		/* Parent waits for foreground job to terminate */
+ 		// if (!bg) {
+ 		// 	int status;
+ 		// 	if (waitpid(pid, &status, 0) < 0){
+ 		// 		fprintf(stderr, "%s: %s\n", "waitfg: waitpid error", strerror(errno));
+   //  			exit(0);
+ 		// 	}
+ 		// }
+ 		// else
+ 		// 	printf("%d %s", pid, cmdline);
  	}
 	return;
  }
