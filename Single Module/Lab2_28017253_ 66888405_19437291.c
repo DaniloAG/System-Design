@@ -1,6 +1,6 @@
 /*
 	Gonzalez, Danilo: 28017253
-	Orozco, Jonathan:
+	Orozco, Jonathan: 66888405
 	Almazan, Adrian: 19437291
 
 	IMPORANT!! 
