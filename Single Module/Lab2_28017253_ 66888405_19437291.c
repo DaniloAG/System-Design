@@ -138,14 +138,14 @@ void reapCommands(){
 	int temp;
 	int i;
 	for (i = 0; i < globalCounter; i++){
-		printf("Killing process %d\n", toReap[i]);
+		// printf("Killing process %d\n", toReap[i]);
 		kill(toReap[i], SIGINT);
 	}
 	for (i = 0; i < globalCounter; i++){
 		pid_t wpid = wait(&temp);
-		if (WIFEXITED(temp)) 
-			printf("Child %d terminated %d\n", wpid, WEXITSTATUS(temp));
-		else 
-			printf("Child terminated abnormally\n");
+		// if (WIFEXITED(temp)) 
+		// 	printf("Child %d terminated %d\n", wpid, WEXITSTATUS(temp));
+		// else 
+		// 	printf("Child terminated abnormally\n");
 	}
 }
