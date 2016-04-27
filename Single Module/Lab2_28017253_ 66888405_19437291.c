@@ -82,10 +82,10 @@ void eval(char *cmdline){
  		else{
  			int status;
  			pid_t wpid;
- 			do {
-				printf("Waiting for child process to terminate \n");
-				wpid = waitpid(pid, &status, 0);
-			} while( !WIFEXITED(status));
+ 			wpid = waitpid(pid, &status, 0);
+ 			while (!WIFEXITED(status)){
+ 				wpid = waitpid(pid, &status, 0);
+ 			}
  			// int status;
  			// if (waitpid(pid, &status, 0) < 0){
  			// 	printf("done processing\n");
@@ -158,7 +158,7 @@ void reapCommands(){
 	int temp;
 	int i;
 	for (i = 0; i < globalCounter; i++){
-		printf("Killing process %d\n", toReap[i]);
+		// printf("Killing process %d\n", toReap[i]);
 		kill(toReap[i], SIGINT);
 	}
 	for (i = 0; i < globalCounter; i++){
