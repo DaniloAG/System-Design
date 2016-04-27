@@ -28,13 +28,16 @@ void eval(char *cmdline);
 int parseline(char *buf, char **argv);
 int builtin_command(char **argv);
 void reapCommands();
+void reaper();
 
 int globalCounter = 0;
 pid_t toReap[MAXARGS];
 
+int globalCompleted = 0;
+pid_t completedReaps[MAXARGS];
+
 int main(){
 	char cmdline[MAXLINE]; 
-
 	while (1) {
 		printf("prompt> ");
  		fgets(cmdline, MAXLINE, stdin);
@@ -72,15 +75,24 @@ void eval(char *cmdline){
  			}
  		}
  	/* Parent waits for foreground job to terminate */
- 		if (!bg) {
- 			int status;
- 			if (waitpid(pid, &status, 0) < 0){
- 				fprintf(stderr, "%s: %s\n", "waitfg: waitpid error", strerror(errno));
-    			exit(0);
- 			}
- 		}
- 		else
+ 		if (bg){
  			printf("%d %s", pid, cmdline);
+ 			signal(SIGCHLD, reaper);
+ 		}
+ 		else{
+ 			int status;
+ 			pid_t wpid;
+ 			do {
+				printf("Waiting for child process to terminate \n");
+				wpid = waitpid(pid, &status, 0);
+			} while( !WIFEXITED(status));
+ 			// int status;
+ 			// if (waitpid(pid, &status, 0) < 0){
+ 			// 	printf("done processing\n");
+ 			// 	fprintf(stderr, "%s: %s\n", "waitfg: waitpid error", strerror(errno));
+    // 			exit(0);
+ 			// }
+ 		}
  	}
  	return;
  }
@@ -132,13 +144,21 @@ int parseline(char *buf, char **argv)
 	return bg;
 }
 
+void reaper(){
+	pid_t process;
+	int status;
+	while ((process = waitpid(-1, &status, WNOHANG)) > 0){
+		
+	}
+}
+
 void reapCommands(){
 	extern int globalCounter;
 	extern pid_t toReap[];
 	int temp;
 	int i;
 	for (i = 0; i < globalCounter; i++){
-		// printf("Killing process %d\n", toReap[i]);
+		printf("Killing process %d\n", toReap[i]);
 		kill(toReap[i], SIGINT);
 	}
 	for (i = 0; i < globalCounter; i++){
