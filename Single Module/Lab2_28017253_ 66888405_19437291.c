@@ -33,9 +33,6 @@ void reaper();
 int globalCounter = 0;
 pid_t toReap[MAXARGS];
 
-int globalCompleted = 0;
-pid_t completedReaps[MAXARGS];
-
 int main(){
 	char cmdline[MAXLINE]; 
 	while (1) {
@@ -115,31 +112,57 @@ void eval(char *cmdline){
  /* parseline - Parse the command line and build the argv array */
 int parseline(char *buf, char **argv)
 {
-	char *delim; 					/* Points to first space delimiter */
-	int argc; 						/* Number of args */
+	char delim[] = "\t \n"; 					/* Points to first space delimiter */
+	int argc = 0; 						/* Number of args */
 	int bg; 						/* Background job? */
+	char* toUse;
+	char* finalString = malloc(sizeof(char) * MAXARGS);
 
- 	buf[strlen(buf)-1] = ' ' ; 		/* Replace trailing ’\n’ with space */
- 	while (*buf && (*buf == ' ' )) 	/* Ignore leading spaces */
- 		buf++;
-
- 	/* Build the argv list */
- 	argc = 0;
- 	while ((delim = strchr(buf, ' '))) {
- 		argv[argc++] = buf;
- 		*delim = '\0';
- 		buf = delim + 1;
- 		while (*buf && (*buf == ' ')) 		/* Ignore spaces */
- 			buf++;
- 	}
- 	argv[argc] = NULL;
-
-	if (argc == 0)						 /* Ignore blank line */
+	toUse = strtok(buf, delim);
+	while (toUse != NULL){
+		argv[argc++] = toUse;
+		strcpy(finalString, toUse);
+		toUse = strtok(NULL, delim);
+	}
+	argv[argc] = NULL;
+	
+	if (argc == 0){
 		return 1;
+	}
 
- 	/* Should the job run in the background? */
-	if ((bg = (*argv[argc-1] == '&')) != 0)
- 		argv[--argc] = NULL;
+	bg = (*argv[argc - 1] == '&' || finalString[strlen(finalString) - 1] == '&');
+	if (bg != 0){
+		if (*argv[argc - 1] == '&'){
+			argv[--argc] = NULL;
+		}
+		else if (finalString[strlen(finalString) - 1] == '&'){
+			finalString[strlen(finalString) - 1] = '\0';
+			argv[argc - 1] = finalString;
+		}
+	}
+
+ // 	buf[strlen(buf)-1] = ' ' ; 		/* Replace trailing ’\n’ with space */
+ // 	while ((*buf && (*buf == ' ' )) || (*buf && (*buf == '\t'))) 	/* Ignore leading spaces */
+ // 		buf++;
+
+ // 	/* Build the argv list */
+ // 	argc = 0;
+ // 	while ((delim = strchr(buf, ' '))) {
+ // 		argv[argc++] = buf;
+ // 		*delim = '\0';
+ // 		buf = delim + 1;
+ // 		while ((*buf && (*buf == ' ')) || (*buf && (*buf == '\t'))) 		/* Ignore spaces */
+ // 			buf++;
+ // 	}
+ // 	argv[argc] = NULL;
+
+	// if (argc == 0)						 /* Ignore blank line */
+	// 	return 1;
+
+ // 	/* Should the job run in the background? */
+	// if ((bg = (*argv[argc-1] == '&')) != 0)
+ // 		argv[--argc] = NULL;
+
 
 	return bg;
 }
