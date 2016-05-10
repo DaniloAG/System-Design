@@ -67,6 +67,7 @@ void eval(char *cmdline){
  		}
  		else{
  			if (bg){
+ 				// printf("lmao");
  				toReap[globalCounter] = pid;
 				globalCounter++;
  			}
