@@ -67,6 +67,7 @@ size_t mem_pagesize(void);
 int mm_init(void);
 void *mm_malloc (size_t size);
 void mm_free (void *ptr);
+void mem_init(void);
 /* $end mallocinterface */
 
 void *mm_realloc(void *ptr, size_t size);
@@ -81,7 +82,7 @@ static char *mem_max_addr; /* Max legal heap addr plus 1*/
 /* ----------------------------------------------------------------------- */
 
 void blocklistFunction();
-void allocateFunction();
+void *allocateFunction(size_t size);
 void freeFunction();
 void printheapFunction();
 void writeheapFunction();
@@ -90,7 +91,13 @@ void inputToCommandTwice(char* first, char* second);
 void inputToCommandThree(char* first, char* second, char* third);
 void inputToCommandFourth(char* first, char* second, char* third, char* fourth);
 
+
+static char *block_heap[400];
+static int block_num = 0;
+
 int main(){
+    mem_init();
+    mm_init();
 	char delimiters[] = "\t \n";
 	while (1){
 		char tempString[100];
@@ -154,6 +161,8 @@ int main(){
 		else{
 			continue;
 		}
+        if (block_heap[1]== NULL)
+            printf("test");
 	}
 }
 
@@ -161,8 +170,14 @@ void blocklistFunction(){
 	printf("blocklist!\n");
 }
 
-void allocateFunction(){
+void *allocateFunction(size_t size){
 	printf("allocate!\n");
+    void *block_ptr;
+    block_ptr = mm_malloc(size);
+
+    printf("%d\n", ++block_num);
+    return block_ptr;
+
 }
 
 void freeFunction(){
@@ -194,7 +209,10 @@ void inputToCommandTwice(char* first, char* second){
 	printf("%s %s\n", first, second);
 	if (strcmp(first, "allocate") == 0){
 		int number = atoi(second);
-		allocateFunction();
+		block_heap[block_num]= allocateFunction(number);
+        printf("%x %x",HDRP(block_heap[1]) ,FTRP(block_heap[1]));
+
+
 	}
 	else if (strcmp(first, "free") == 0){
 		freeFunction();
