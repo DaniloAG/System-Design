@@ -82,7 +82,7 @@ static char *mem_max_addr; /* Max legal heap addr plus 1*/
 /* ----------------------------------------------------------------------- */
 
 void blocklistFunction();
-void *allocateFunction(size_t size);
+void *allocateFunction(size_t size, int);
 void freeFunction(int num);
 void printheapFunction(int block_number, int bytes);
 void writeheapFunction(int block_number, char* letter, int number);
@@ -161,18 +161,19 @@ int main(){
 		else{
 			continue;
 		}
-        if (block_heap[1]== NULL)
+		if (block_heap[0]== NULL)
             printf("test");
 	}
 }
 
 void blocklistFunction(){
-    int i = 1;
-    for ( void* bp = block_heap[i]; i< block_num+1;  bp = NEXT_BLKP(bp)){
+    int i = 0;
+    void* bp;
+    for (bp = block_heap[i]; i < block_num;  bp = NEXT_BLKP(bp)){
         if (GET_ALLOC(HDRP(block_heap[i]))==1){
-            printf("%d yes %x %x\n",GET_SIZE(HDRP(block_heap[i])), HDRP(block_heap[i]) ,FTRP(block_heap[i]));
+            printf("%d yes %x %x\n", GET_SIZE(HDRP(block_heap[i])), HDRP(block_heap[i]) ,FTRP(block_heap[i]));
         }else{
-            printf("%d no %x %x\n",GET_SIZE(HDRP(block_heap[i])), HDRP(block_heap[i]) ,FTRP(block_heap[i]));
+            printf("%d no %x %x\n", GET_SIZE(HDRP(block_heap[i])), HDRP(block_heap[i]) ,FTRP(block_heap[i]));
            
         }
         i++;
@@ -180,36 +181,37 @@ void blocklistFunction(){
 	
 }
 
-void *allocateFunction(size_t size){
+void *allocateFunction(size_t size, int block_number){
 	printf("allocate!\n");
     void *block_ptr;
     block_ptr = mm_malloc(size);
 
-    printf("%d\n", ++block_num);
+    printf("%d\n", block_number + 1);
     return block_ptr;
 
 }
 
 void freeFunction(int num){
-	mm_free(block_heap[num]);
+	mm_free(block_heap[num - 1]);
 }
 
 void printheapFunction(int block_number, int bytes){
-	void *bp = block_heap[block_number];
-    for (int i = 0; i < bytes; i++){
+	void *bp = block_heap[block_number - 1];
+	int i;
+    for (i = 0; i < bytes; i++){
         printf("%c", GET(bp));
         bp++;
     }
 }
 
 void writeheapFunction(int block_number, char* letter, int number){
-    printf("writing %s\n ",letter);
-
-    void *bp = block_heap[block_number];
-    for ( int i = 0; i< number;  i++){
-        PUT(bp, letter);
-        bp++;
-    }
+    // printf("writing %s\n ",letter);
+    // void *bp = block_heap[block_number - 1];
+    // int i;
+    // for (i = 0; i< number;  i++){
+    //     PUT(bp, letter);
+    //     bp++;
+    // }
 }
 
 int inputToCommandOne(char* first){
@@ -229,7 +231,8 @@ void inputToCommandTwice(char* first, char* second){
 	printf("%s %s\n", first, second);
 	if (strcmp(first, "allocate") == 0){
 		int number = atoi(second);
-		block_heap[block_num]= allocateFunction(number);
+		block_heap[block_num]= allocateFunction(number, block_num);
+		block_num++;
 	}
 	else if (strcmp(first, "free") == 0){
         int number = atoi(second);
@@ -661,4 +664,3 @@ size_t mem_heapsize()
 {
     return (size_t)((void *)mem_brk - (void *)mem_heap);
 }
-
