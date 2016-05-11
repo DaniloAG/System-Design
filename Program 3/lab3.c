@@ -205,13 +205,14 @@ void printheapFunction(int block_number, int bytes){
 }
 
 void writeheapFunction(int block_number, char* letter, int number){
-    // printf("writing %s\n ",letter);
-    // void *bp = block_heap[block_number - 1];
-    // int i;
-    // for (i = 0; i< number;  i++){
-    //     PUT(bp, letter);
-    //     bp++;
-    // }
+    printf("writing %s\n ",letter);
+    char letterToUse = *letter;
+    void *bp = block_heap[block_number - 1];
+    int i;
+    for (i = 0; i< number;  i++){
+        PUT(bp, letterToUse);
+        bp++;
+    }
 }
 
 int inputToCommandOne(char* first){
