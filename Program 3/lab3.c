@@ -93,6 +93,8 @@ void inputToCommandFourth(char* first, char* second, char* third, char* fourth);
 
 
 static char *block_heap[100];
+static int number_counter[100];
+static int numberCounterGlobal = 0;
 static int block_num = 0;
 
 int main(){
@@ -161,32 +163,46 @@ int main(){
 		else{
 			continue;
 		}
-		if (block_heap[0]== NULL)
-            printf("test");
 	}
 }
 
+
+/* ----------------------------------- HELPER FUNCTIONS WE IMPLEMENTED -----------------------------------*/
+
 void blocklistFunction(){
+    if (block_heap[0] == NULL){
+        return;
+    }
     int i = 0;
+    int counter = 0;
     void* bp;
+    printf("Size\tAlloc\tStart\tEnd\n");
     for (bp = block_heap[i]; i < block_num;  bp = NEXT_BLKP(bp)){
         if (GET_ALLOC(HDRP(block_heap[i]))==1){
-            printf("%d yes %x %x\n", GET_SIZE(HDRP(block_heap[i])), HDRP(block_heap[i]) ,FTRP(block_heap[i]));
+            printf("%d\tyes\t0x%x\t0x%x\n", number_counter[counter], HDRP(block_heap[i]) ,FTRP(block_heap[i]) + 4);
         }else{
-            printf("%d no %x %x\n", GET_SIZE(HDRP(block_heap[i])), HDRP(block_heap[i]) ,FTRP(block_heap[i]));
+            printf("%d\tno\t0x%x\t0x%x\n", number_counter[counter], HDRP(block_heap[i]) ,FTRP(block_heap[i]) + 4);
+           
+        // if (GET_ALLOC(HDRP(block_heap[i]))==1){
+        //     printf("%d\tyes\t0x%x\t0x%x\n", GET_SIZE(HDRP(block_heap[i])), HDRP(block_heap[i]) ,FTRP(block_heap[i]) + 4);
+        // }else{
+        //     printf("%d\tno\t0x%x\t0x%x\n", GET_SIZE(HDRP(block_heap[i])), HDRP(block_heap[i]) ,FTRP(block_heap[i]) + 4);
            
         }
+        counter++;
         i++;
     }
 	
 }
 
 void *allocateFunction(size_t size, int block_number){
-	printf("allocate!\n");
+	// printf("allocate!\n");
     void *block_ptr;
     block_ptr = mm_malloc(size);
 
     printf("%d\n", block_number + 1);
+    number_counter[numberCounterGlobal] = size;
+    numberCounterGlobal++;
     return block_ptr;
 
 }
@@ -202,10 +218,11 @@ void printheapFunction(int block_number, int bytes){
         printf("%c", GET(bp));
         bp++;
     }
+    printf("\n");
 }
 
 void writeheapFunction(int block_number, char* letter, int number){
-    printf("writing %s\n ",letter);
+    // printf("writing %s\n ",letter);
     char letterToUse = *letter;
     void *bp = block_heap[block_number - 1];
     int i;
@@ -216,7 +233,6 @@ void writeheapFunction(int block_number, char* letter, int number){
 }
 
 int inputToCommandOne(char* first){
-	printf("%s\n", first);
 	if (strcmp(first, "quit") == 0){
 		return 1;
 	}
@@ -229,7 +245,6 @@ int inputToCommandOne(char* first){
 }
 
 void inputToCommandTwice(char* first, char* second){
-	printf("%s %s\n", first, second);
 	if (strcmp(first, "allocate") == 0){
 		int number = atoi(second);
 		block_heap[block_num]= allocateFunction(number, block_num);
@@ -246,7 +261,6 @@ void inputToCommandTwice(char* first, char* second){
 }
 
 void inputToCommandThree(char* first, char* second, char* third){
-	printf("%s %s %s\n", first, second, third);
 	if (strcmp(first, "printheap") == 0){
         int number = atoi(second);
         int number_2 = atoi(third);
@@ -258,7 +272,6 @@ void inputToCommandThree(char* first, char* second, char* third){
 }
 
 void inputToCommandFourth(char* first, char* second, char* third, char* fourth){
-	printf("%s %s %s %s\n", first, second, third, fourth);
 	if (strcmp(first, "writeheap") == 0){
         int number = atoi(second);
         int number_2= atoi(fourth);
@@ -269,9 +282,9 @@ void inputToCommandFourth(char* first, char* second, char* third, char* fourth){
 	}
 }
 
+/* -----------------------------------------------------------------------------------------*/
 
-
-/* ------------------------ FUNCTIONS FROM THE BOOK -------------------------- */
+/* ----------------------------------- FUNCTIONS FROM BOOK ---------------------------------*/
 
 int mm_init(void) 
 {
