@@ -38,7 +38,8 @@ unsigned int is_allocated(char *bp){
 	return *bp2%2;
 }
 void printstuff() {
-	for(int i = 0; i < 10; i++) {
+	int i;
+	for(i = 0; i < 10; i++) {
 		printf("%d. [%d]\n", i, heap[i]);
 	}
 }
@@ -97,7 +98,8 @@ void blocklist(){
 void write_heap(int bn, char letter, int copies){
 	char *bp = block_array[bn];
 	bp+=1;
-	for (int i = 0; i < copies; i++, bp++){
+	int i;
+	for (i = 0; i < copies; i++, bp++){
 		*bp = letter;
 	}
 
@@ -107,7 +109,8 @@ void write_heap(int bn, char letter, int copies){
 void print_heap(int bn, int copies){
 	char *bp = block_array[bn];
 	bp+=1;
-	for (int i = 0; i < copies; i++, bp++){
+	int i;
+	for (i = 0; i < copies; i++, bp++){
 		printf("%c",*bp);
 	}
 	printf("\n");
