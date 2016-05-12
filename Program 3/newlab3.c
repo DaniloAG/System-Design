@@ -1,3 +1,9 @@
+/*
+	Gonzalez, Danilo: 28017253
+	Orozco, Jonathan: 66888405
+	Almazan, Adrian: 19437291
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -7,6 +13,7 @@ unsigned int get_size(char *bp);
 void allocate(char* bp, int size);
 unsigned int is_allocated(char *bp);
 void printstuff();
+void setNullArray();
 void insert(int size);
 void free_block(int bn);
 void blocklist();
@@ -21,6 +28,8 @@ char* heap;
 int block_number = 1;
 int blockCount = 0;
 char* block_array[400];
+
+int globalCounter = 0;
 
 
 unsigned int get_size(char *bp){
@@ -45,10 +54,22 @@ void printstuff() {
 }
 
 
+void setNullArray(){
+	int i;
+	for (i = 0; i < 400; i++){
+		block_array[i] = NULL;
+	}
+}
+
 //insert
 void insert(int size) {
-	if (size > 127){
+	if (size > 127 || size < 0){
 		printf("%d is invalid!\n", size);
+		return;
+	}
+	int tempCounter = globalCounter + size;
+	if (tempCounter >= 400){
+		printf("Memory overloaded!\n");
 		return;
 	}
 	// copy pointer
@@ -67,6 +88,7 @@ void insert(int size) {
 	}
 	allocate(bp,size);
 	block_array[block_number++]= bp;
+	globalCounter = globalCounter + size;
 	printf("%d\n", ++blockCount);
 }
 //free
@@ -75,9 +97,13 @@ void free_block(int bn){
 	// for (int i = 1; i < 5;i++){
 	// 	printf("%p\n", block_array[i]);
 	// }
+	if (block_array[bn] == NULL){
+		printf("Block is free / not allocated.\n");
+		return;
+	}
 	unsigned char *delete_bp =  (unsigned char*)block_array[bn];
 	*delete_bp = *delete_bp-1;
-	block_array[bn] = 0;
+	block_array[bn] = NULL;
 
 }
 
@@ -87,7 +113,7 @@ void blocklist(){
 	printf("Size\tAlloc\tStart\t\tEnd\n");
 	while(!((get_size(bp) == 0) && is_allocated(bp) ==0)){
 
-		 printf("%d\t%s\t%p\t%p\n", get_size(bp), is_allocated(bp)? "yes":"no", bp, bp+get_size(bp));
+		 printf("%d\t%s\t%p\t%p\n", get_size(bp) + 1, is_allocated(bp)? "yes":"no", bp, bp+get_size(bp));
 		 bp += get_size(bp)+1;
 	}
 
@@ -96,8 +122,16 @@ void blocklist(){
 //wh
 
 void write_heap(int bn, char letter, int copies){
+	if (block_array[bn] == NULL){
+		printf("Block is not allocated.\n");
+		return;
+	}
 	char *bp = block_array[bn];
-	bp+=1;
+	if (copies > get_size(bp)){
+		printf("WriteHeap: Not enough space to write.\n");
+		return;
+	}
+	bp += 1;
 	int i;
 	for (i = 0; i < copies; i++, bp++){
 		*bp = letter;
@@ -107,10 +141,20 @@ void write_heap(int bn, char letter, int copies){
 
 //ph
 void print_heap(int bn, int copies){
+	if (block_array[bn] == NULL){
+		printf("Block is not allocated.\n");
+		return;
+	}
 	char *bp = block_array[bn];
-	bp+=1;
+	bp += 1;
 	int i;
 	for (i = 0; i < copies; i++, bp++){
+		if (i == get_size(bp)){
+			bp = block_array[++bn];
+			bp++;
+			copies = copies - i;
+			i = 0;
+		}
 		printf("%c",*bp);
 	}
 	printf("\n");
@@ -121,6 +165,7 @@ void print_heap(int bn, int copies){
 
 int main(){
 	heap = malloc(sizeof(char) * 400);
+	setNullArray();
 	char delimiters[] = "\t \n";
 	while (1){
 		char tempString[100];
@@ -157,6 +202,9 @@ int main(){
 				fourthVariable = tempPointer;
 				numberCounter++;
 			}
+			else{
+				numberCounter++;
+			}
 		}
 
 
@@ -173,7 +221,7 @@ int main(){
 				printf("%s is not a valid command!\n", commandVariable);
 			}
 		}
-		else if (numberCounter == 2){
+		else if (numberCounter == 2 ){
 			inputToCommandTwice(commandVariable, secondaryVariable);
 		}
 		else if (numberCounter == 3){
@@ -182,29 +230,15 @@ int main(){
 		else if (numberCounter == 4){
 			inputToCommandFourth(commandVariable, secondaryVariable, thirdVariable, fourthVariable);
 		}
+		else if (numberCounter == 5){
+			printf("Not a valid command!\n");
+			continue;
+		}
 		else{
 			continue;
 		}
 	}
 }
-
-// int main(){
-// 	heap = malloc(sizeof(char) * 400);
-
-// 	char * block_pointer = heap;
-// 	insert(2);
-// 	insert(2);
-// 	//allocate(block_pointer, 5);
-// 	printstuff();
-// 	write_heap(1,'a',2);
-// 	printf("%d\n", get_size(heap));
-// 	printf("%d\n", is_allocated(heap));
-// 	print_heap(1,2);
-// 	// blocklist();
-// 	// blocklist();
-// 	// printstuff();
-// 	free(heap);
-// }
 
 int inputToCommandOne(char* first){
 	if (strcmp(first, "quit") == 0){
