@@ -46,6 +46,7 @@ void format_log_entry(char *logstring, struct sockaddr_in *sockaddr, char *uri, 
 int main(int argc, char **argv)
 {
     /* $begin solution */
+    char* tempString;
     int listenfd;             /* The proxy's listening descriptor */
     int port;                 /* The port the proxy is listening on */
     pthread_t tid;            /* Pthread thread id */
@@ -53,8 +54,15 @@ int main(int argc, char **argv)
     arglist_t *argp = NULL;   /* Argument struct passed to each thread */
     int request_count = 0;    /* Number of requests received so far */
     /* $end solution */
-
     /* Check arguments */
+    while(1)
+    {
+        printf("unix> ");
+        fgets(tempString, 100, stdin);
+        if (strcmp(tempString, "\n") == 0){
+            continue;
+        }
+    }
     if (argc != 2) {
 	fprintf(stderr, "Usage: %s <port number>\n", argv[0]);
 	exit(0);
