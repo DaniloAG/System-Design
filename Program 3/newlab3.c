@@ -10,10 +10,9 @@
 #include <string.h>
 
 unsigned short get_size(char *bp);
-void allocate(char* bp, int size);
+void allocate(char* bp, unsigned short size);
 unsigned short is_allocated(char *bp);
 void printstuff();
-void setNullArray();
 void insert(int size);
 void free_block(int bn);
 void blocklist();
@@ -27,80 +26,91 @@ void inputToCommandFourth(char* first, char* second, char* third, char* fourth);
 char* heap;
 int block_number = 1;
 int blockCount = 1;
-char* block_array[400];
+int memCounter;
 
-int globalCounter = 0;
+int globalCounter = 1;
 
 
 unsigned short get_size(char *bp){
-	unsigned short *bp2 =  (unsigned short*)bp+1;
-	return *bp2 >>7 ;
+	unsigned short bp2 =  (unsigned short)(
+		((unsigned char) bp[0]) <<8 | 
+		((unsigned char)bp[1])
+		);
+	return bp2 >>7 ;
 
 }
-void allocate(char* bp, int size){
-	unsigned short *bp2 =  (unsigned short*)bp+1;
-	*bp2 = (size<<7)+block_number;
-	printf("%d\n", blockCount);
-	blockCount++;
+void allocate(char* bp, unsigned short size){
+	size = (size << 7 )+ globalCounter++;
+	bp[1] = size & 0xFF;
+	bp[0]= (size>>8 ) & 0xFF;	 
 }
 
 unsigned short is_allocated(char *bp){
-	unsigned short *bp2 =  (unsigned short*)bp+1;
-	return *bp2 & 0x7f;
+		unsigned short bp2 =  (unsigned short)(
+		((unsigned char) bp[0]) <<8 | 
+		((unsigned char)bp[1])
+		);
+		return bp2 & 0x7f;
 }
 void printstuff() {
 	int i;
-	for(i = 0; i < 10; i++) {
+	for(i = 0; i < 20; i++) {
 		printf("%d. [%d]\n", i, heap[i]);
 	}
 }
 
 
-void setNullArray(){
-	int i;
-	for (i = 0; i < 400; i++){
-		block_array[i] = NULL;
-	}
-}
 
-//insert
+
 void insert(int size) {
-	if (size > 400 || size < 0){
+	if (size > 398 || size <= 0){
 		printf("%d is invalid!\n", size);
 		return;
 	}
-	int tempCounter = globalCounter + size;
-	if (tempCounter >= 400){
+	int tempCounter = memCounter + size + 2;
+	if (tempCounter > 400){
 		printf("Memory overloaded!\n");
 		return;
 	}
-	// copy pointer
+	
 	char *bp = heap;
-	// copy head pointer
 
-	// when do i want to stop
-	// get_size = 0 && is_allocated == 0
-	// OR
-	// get_size = size && is_allocated == 0
+
 	while( ! ( (get_size(bp) == 0 && is_allocated(bp) ==0) || (get_size(bp) ==size &&  is_allocated(bp)==0))  ) {
-		// tmp_size = get_size(bp)
-		// bp = bp + 1 + tmp_size
-		// check end, end = heap+400; if bp > end
+	
+		if(size<get_size(bp)-2 && is_allocated(bp) ==0 ){
+			int old_size = get_size(bp)-size-2;
+			allocate(bp,size);
+			printf("%d\n", blockCount++);
+
+			
+			bp += get_size(bp) + 2 ;
+			allocate(bp, old_size);
+			
+			free_block(--globalCounter);
+
+			return;
+		}
 		bp += get_size(bp)+2;
 	}
 	allocate(bp,size);
-	globalCounter = globalCounter + size;
+	memCounter = memCounter + size;
+	printf("%d\n", blockCount++);
 }
-//free
+
 
 void free_block(int bn){
-	// for (int i = 1; i < 5;i++){
-	// 	printf("%p\n", block_array[i]);
-	// }
+
 	char *bp = heap;
 
 	while( ! ( (get_size(bp) == 0 && is_allocated(bp) ==0) || (is_allocated(bp) == bn) || bp >= heap +400)  ) {
+	
 		bp += get_size(bp)+2;
+	}
+	
+	if (is_allocated(bp)== bn){
+		bp[1] = bp[1] & 0x80;
+		return;
 	}
 
 	if ((get_size(bp) == 0 && is_allocated(bp) ==0) || bp >= heap +400) {
@@ -108,32 +118,26 @@ void free_block(int bn){
 		return;
 	}
 
-	unsigned short *delete_bp =  (unsigned short*)bp+1;
-	*delete_bp = *delete_bp  & 0x7f;
+
 }
 
-//bl 
+
 void blocklist(){
 	char *bp = heap;
-	printf("Size\tAlloc\tStart\t\tEnd\n");
+	printf("Block\tSize\tAlloc\tStart\t\tEnd\n");
 	while(!((get_size(bp) == 0) && is_allocated(bp) ==0)){
 
-		 printf("%d\t%s\t%p\t%p\n", get_size(bp) + 2, is_allocated(bp)? "yes":"no", bp, bp+get_size(bp));
+		 printf("%d\t%d\t%s\t%p\t%p\n", is_allocated(bp), get_size(bp) + 2, is_allocated(bp)? "yes":"no", bp, bp+get_size(bp)+1);
 		 bp += get_size(bp)+2;
 	}
 
 }
 
-//wh
+
 
 void write_heap(int bn, char letter, int copies){
 	char *bp = heap;
 	
-	if (copies > get_size(bp)){
-		printf("WriteHeap: Not enough space to write.\n");
-		return;
-	}
-	//bp += 2;
 
 	while( ! ( (get_size(bp) == 0 && is_allocated(bp) ==0) || (is_allocated(bp) == bn) || bp >= heap +400)  ) {
 		bp += get_size(bp)+2;
@@ -143,9 +147,12 @@ void write_heap(int bn, char letter, int copies){
 		printf("Not Found\n");
 		return;
 	}
+	if (copies > get_size(bp)){
+		printf("WriteHeap: Not enough space to write.\n");
+		return;
+	}
 
-
-	*bp += 2;
+	bp += 2;
 
 	int i;
 	for (i = 0; i < copies; i++, bp++){
@@ -154,15 +161,10 @@ void write_heap(int bn, char letter, int copies){
 
 }
 
-//ph
+
 void print_heap(int bn, int copies){
 	char *bp = heap;
 	
-	if (copies > get_size(bp)){
-		printf("WriteHeap: Not enough space to write.\n");
-		return;
-	}
-	//bp += 2;
 
 	while( ! ( (get_size(bp) == 0 && is_allocated(bp) ==0) || (is_allocated(bp) == bn) || bp >= heap +400)  ) {
 		bp += get_size(bp)+2;
@@ -175,12 +177,7 @@ void print_heap(int bn, int copies){
 	bp += 2;
 	int i;
 	for (i = 0; i < copies; i++, bp++){
-		// if (i == get_size(bp)){
-		// 	bp = block_array[++bn];
-		// 	bp += 2;
-		// 	copies = copies - i;
-		// 	i = 0;
-		// }
+
 		printf("%c",*bp);
 	}
 	printf("\n");
@@ -191,7 +188,6 @@ void print_heap(int bn, int copies){
 
 int main(){
 	heap = malloc(sizeof(char) * 400);
-	setNullArray();
 	char delimiters[] = "\t \n";
 	while (1){
 		char tempString[100];
@@ -282,6 +278,7 @@ void inputToCommandTwice(char* first, char* second){
 	if (strcmp(first, "allocate") == 0){
 		int number = atoi(second);
 		insert(number);
+	
 	}
 	else if (strcmp(first, "free") == 0){
         int number = atoi(second);
