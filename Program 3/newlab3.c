@@ -50,6 +50,10 @@ void allocate(char* bp, unsigned short size){
 	bp[0]= (size>>8 ) & 0xFF;	 
 }
 
+void de_allocate(char *pointer) {
+    pointer[1] = pointer[1] & ~0x01;
+}
+
 unsigned short is_allocated(char *bp){
 		unsigned short bp2 =  (unsigned short)(
 		((unsigned char) bp[0]) <<8 | 
@@ -57,13 +61,6 @@ unsigned short is_allocated(char *bp){
 		);
 		return bp2 & 0x7f;
 }
-void printstuff() {
-	int i;
-	for(i = 0; i < 20; i++) {
-		printf("%d. [%d]\n", i, heap[i]);
-	}
-}
-
 
 
 
@@ -119,7 +116,6 @@ void insert(int size) {
 
 void free_block(int bn){
 	char *bp = heap;
-
 	while( ! ( (get_size(bp) == 0 && is_allocated(bp) ==0) || (is_allocated(bp) == bn) || bp >= heap +400)  ) {
 	
 		bp += get_size(bp)+2;
@@ -144,16 +140,18 @@ void free_block(int bn){
 
 
 void blocklist(){
-	char *bp = heap;
 	printf("Size\tAlloc\tStart\t\tEnd\n");
-	while(!((get_size(bp) == 0) && is_allocated(bp) ==0)){
 
-		 printf("%d\t%s\t%p\t%p\n", get_size(bp) + 2, is_allocated(bp)? "yes":"no", bp, bp+get_size(bp)+1);
-		 bp += get_size(bp)+2;
+	char *current_index = heap;
+	unsigned short current_size;
+	while(current_index < max_heap && (get_size(current_index) != 0)){
+		current_size = get_size(current_index);
+		 printf("%d\t%s\t%p\t%p\n", get_size(current_index) + 2, is_allocated(current_index)? "yes":"no", current_index, current_index+get_size(current_index)+1);
+		 current_index += current_size + 2;
 	}
-	if (totalNumber != 0 && totalNumber > 0){
-		printf("%d\t%s\t%p\t%p\n", totalNumber, is_allocated(bp)? "yes":"no", bp, max_heap);
-	}
+	// if (totalNumber != 0 && totalNumber > 0){
+	// 	printf("%d\t%s\t%p\t%p\n", totalNumber, is_allocated(bp)? "yes":"no", bp, max_heap);
+	// }
 }
 
 
@@ -212,6 +210,8 @@ void print_heap(int bn, int copies){
 int main(){
 	heap = malloc(sizeof(char) * 400);
 	max_heap = heap + 400;
+	allocate(heap, 398);
+	de_allocate(heap);
 	char delimiters[] = "\t \n";
 	while (1){
 		char tempString[100];
