@@ -306,7 +306,7 @@ void inputToCommandTwice(char* first, char* second){
 	}
 	else if (strcmp(first, "free") == 0){
         int number = atoi(second);
-		free_block(number);
+		free_block(number + 1);
 
 	}
 	else{
@@ -318,7 +318,7 @@ void inputToCommandThree(char* first, char* second, char* third){
 	if (strcmp(first, "printheap") == 0){
         int number = atoi(second);
         int number_2 = atoi(third);
-		print_heap(number, number_2);
+		print_heap(number + 1, number_2);
 	}
 	else{
 		printf("%s is not a valid command!\n", first);
@@ -330,7 +330,7 @@ void inputToCommandFourth(char* first, char* second, char* third, char* fourth){
         int number = atoi(second);
         int number_2= atoi(fourth);
         char letterToUse = *third;
-		write_heap(number, letterToUse, number_2);
+		write_heap(number + 1, letterToUse, number_2);
 	}
 	else{
 		printf("%s is not a valid command!\n", first);
