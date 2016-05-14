@@ -24,9 +24,14 @@ void inputToCommandThree(char* first, char* second, char* third);
 void inputToCommandFourth(char* first, char* second, char* third, char* fourth);
 
 char* heap;
+char* max_heap;
 int block_number = 1;
 int blockCount = 1;
-int memCounter;
+int memCounter = 0;
+int totalNumber = 400;
+int tempNumber;
+int boolChecker = 0;
+
 
 int globalCounter = 1;
 
@@ -68,11 +73,11 @@ void insert(int size) {
 		return;
 	}
 	int tempCounter = memCounter + size + 2;
+	//printf("temp counter: %d\n", tempCounter);
 	if (tempCounter > 400){
 		printf("Memory overloaded!\n");
 		return;
 	}
-	
 	char *bp = heap;
 
 
@@ -82,25 +87,25 @@ void insert(int size) {
 			int old_size = get_size(bp)-size-2;
 			allocate(bp,size);
 			printf("%d\n", blockCount++);
-
+			tempNumber = size;
 			
 			bp += get_size(bp) + 2 ;
 			allocate(bp, old_size);
-			
+			boolChecker = 1;
 			free_block(--globalCounter);
-
+			boolChecker = 0;
 			return;
 		}
-		bp += get_size(bp)+2;
+		bp += get_size(bp) + 2;
 	}
 	allocate(bp,size);
-	memCounter = memCounter + size;
+	memCounter = memCounter + size + 2;
+	totalNumber = totalNumber - size - 2;
 	printf("%d\n", blockCount++);
 }
 
 
 void free_block(int bn){
-
 	char *bp = heap;
 
 	while( ! ( (get_size(bp) == 0 && is_allocated(bp) ==0) || (is_allocated(bp) == bn) || bp >= heap +400)  ) {
@@ -109,6 +114,12 @@ void free_block(int bn){
 	}
 	
 	if (is_allocated(bp)== bn){
+		if (boolChecker == 0){
+			memCounter = memCounter - get_size(bp) - 2;
+		}
+		else{
+			memCounter = memCounter + tempNumber + 2; 
+		}
 		bp[1] = bp[1] & 0x80;
 		return;
 	}
@@ -117,20 +128,20 @@ void free_block(int bn){
 		printf("Not Found\n");
 		return;
 	}
-
-
 }
 
 
 void blocklist(){
 	char *bp = heap;
-	printf("Block\tSize\tAlloc\tStart\t\tEnd\n");
+	printf("Size\tAlloc\tStart\t\tEnd\n");
 	while(!((get_size(bp) == 0) && is_allocated(bp) ==0)){
 
-		 printf("%d\t%d\t%s\t%p\t%p\n", is_allocated(bp), get_size(bp) + 2, is_allocated(bp)? "yes":"no", bp, bp+get_size(bp)+1);
+		 printf("%d\t%s\t%p\t%p\n", get_size(bp) + 2, is_allocated(bp)? "yes":"no", bp, bp+get_size(bp)+1);
 		 bp += get_size(bp)+2;
 	}
-
+	if (totalNumber != 0 && totalNumber > 0){
+		printf("%d\t%s\t%p\t%p\n", totalNumber, is_allocated(bp)? "yes":"no", bp, max_heap);
+	}
 }
 
 
@@ -188,6 +199,7 @@ void print_heap(int bn, int copies){
 
 int main(){
 	heap = malloc(sizeof(char) * 400);
+	max_heap = heap + 400;
 	char delimiters[] = "\t \n";
 	while (1){
 		char tempString[100];
