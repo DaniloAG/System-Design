@@ -80,9 +80,12 @@ void insert(int size) {
 	}
 	char *bp = heap;
 
-
 	while( ! ( (get_size(bp) == 0 && is_allocated(bp) ==0) || (get_size(bp) ==size &&  is_allocated(bp)==0))  ) {
-	
+		if (bp > max_heap){
+			printf("Not enough space!\n");
+			return;
+		}
+
 		if(size<get_size(bp)-2 && is_allocated(bp) ==0 ){
 			int old_size = get_size(bp)-size-2;
 			allocate(bp,size);
@@ -98,9 +101,18 @@ void insert(int size) {
 		}
 		bp += get_size(bp) + 2;
 	}
+
+	if (bp >= max_heap){
+		printf("Not enough space!\n");
+		return;
+	}
 	allocate(bp,size);
 	memCounter = memCounter + size + 2;
-	totalNumber = totalNumber - size - 2;
+	// printf("totalNumber before: %d\n", totalNumber);
+	if (totalNumber > 0){
+		totalNumber = totalNumber - size - 2;
+	}
+	// printf("totalNumber after: %d\n", totalNumber);
 	printf("%d\n", blockCount++);
 }
 
@@ -113,7 +125,7 @@ void free_block(int bn){
 		bp += get_size(bp)+2;
 	}
 	
-	if (is_allocated(bp)== bn){
+	if (is_allocated(bp) == bn){
 		if (boolChecker == 0){
 			memCounter = memCounter - get_size(bp) - 2;
 		}
