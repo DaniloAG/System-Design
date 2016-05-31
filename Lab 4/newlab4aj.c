@@ -21,6 +21,9 @@ FILE* logfile;
 
 void process_request(int connfd, struct sockaddr_in* clientaddr);
 int parse_uri(char* uri, char* hostname, char* pathname, int* port);
+void get_hostname(char* uri, char* hostname);
+void get_pathname(char* uri, char* hostname, char* pathname)
+void get_port(char* hostname, int* port);
 void format_log_entry(char* log_entry, struct sockaddr_in* sockaddr, char* uri, int size);
 int checkArguments(int argc);
 int checkPortNumber(char* number);
