@@ -212,7 +212,7 @@ void get_hostname(char* uri, char* hostname){
 	char *begin;
 	char *end;
 
-	iif(strncasecmp(uri, "http://", 7) !=0){
+	if(strncasecmp(uri, "http://", 7) !=0){
 		hostname[0]= '\0';
 		return;
 	}
