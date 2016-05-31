@@ -22,8 +22,8 @@ FILE* logfile;
 void process_request(int connfd, struct sockaddr_in* clientaddr);
 int parse_uri(char* uri, char* hostname, char* pathname, int* port);
 void get_hostname(char* uri, char* hostname);
-void get_pathname(char* uri, char* hostname, char* pathname)
-void get_port(char* hostname, int* port);
+void get_pathname(char* uri, char* hostname, char* pathname);
+void get_port(char* uri, char* hostname, int* port);
 void format_log_entry(char* log_entry, struct sockaddr_in* sockaddr, char* uri, int size);
 int checkArguments(int argc);
 int checkPortNumber(char* number);
@@ -209,22 +209,22 @@ void process_request(int connfd, struct sockaddr_in* clientaddr) {
 }
 
 void get_hostname(char* uri, char* hostname){
-	char *hbegin;
+	char *begin;
 	char *end;
 
-	if (strcmp(uri,"htpp://",) !=0){
+	if (strcmp(uri,"htpp://") !=0){
 		hostname[0]= '\0';
 		return;
 	}
 
 	begin = uri + 7;
-	end = strchr(begin, " :/\r\n" );
+	end = strpbrk(begin, " :/\r\n" );
 
 	strcpy(hostname, begin);
 	if (end ==  NULL){
-		hostname[strlen(begin)]= '\0'
+		hostname[strlen(begin)]= '\0';
 	} else{
-		hostname[end-begin] = '\0'
+		hostname[end-begin] = '\0';
 			}
 
 }
@@ -249,9 +249,9 @@ void get_port(char* uri, char* hostname, int* port){
 	char *begin;
 
 	begin = uri + 7;
-	char* end = strchr(begin, " :/\r\n" );
+	char* end = strpbrk(begin, " :/\r\n" );
 	if (end != NULL && *end == ':') {
-		*port = atoi(hostend + 1);
+		*port = atoi(end + 1);
 	}
 
 
@@ -268,7 +268,7 @@ int parse_uri(char* uri, char* hostname, char* pathname, int* port) {
 	// }
 	get_hostname(uri, hostname);
 
-	if(hostname[0]== '\0';){
+	if(hostname[0]== '\0'){
 		return -1;
 	}
 
@@ -288,7 +288,7 @@ int parse_uri(char* uri, char* hostname, char* pathname, int* port) {
 	// }
 	get_port(uri,hostname,port);
 
-	get_pathname(uri,hostname,pathname)
+	get_pathname(uri,hostname,pathname);
 	// pathbegin = strchr(hostbegin, '/');
 	// if(pathbegin == NULL) {
 	// 	pathname[0] = '\0';
