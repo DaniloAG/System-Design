@@ -230,7 +230,7 @@ void get_pathname(char* uri, char* hostname, char* pathname){
 	char *begin;
 
 	begin = uri + 7;
-	begin = strchr(being, '/');
+	begin = strchr(begin, '/');
 	if(begin == NULL){
 		pathname[0]= '\0';
 
