@@ -26,6 +26,10 @@ int checkArguments(int argc);
 int checkPortNumber(char* number);
 int checkSocket();
 void sigchld_handler(int sig);
+// int extract_url(char* request, char* url);
+int extract_hostname(char* request, char* hostname);
+// int extract_port(struct request *request, char *port_char);
+// int extract_pathname();
 
 /* Functions declared below were taken from csapp.h */
 #define	MAXLINE	 8192  
@@ -52,6 +56,7 @@ ssize_t Rio_readn(int fd, void *ptr, size_t nbytes);
 ssize_t rio_readn(int fd, void *usrbuf, size_t n);
 int open_clientfd(char *hostname, int port);
 int Open_clientfd(char *hostname, int port);
+int open_listenfd(char *port);
 /* Functions declared above were taken from csapp.h */
 
 int main(int argc, char ** argv) {
@@ -68,25 +73,25 @@ int main(int argc, char ** argv) {
     if ((port = checkPortNumber(argv[1])) < 0){
        exit(1);
     }
-    if ((listenfd = checkSocket()) < 0){
+    if ((listenfd = open_listenfd(argv[1])) < 0){
         exit(1);
     }
 
+    signal(SIGCHLD, sigchld_handler);
 	signal(SIGPIPE,SIG_IGN);
 
-	bzero((char *) &serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(port);
+	// bzero((char *) &serv_addr, sizeof(serv_addr));
+ //    serv_addr.sin_family = AF_INET;
+ //    serv_addr.sin_addr.s_addr = INADDR_ANY;
+ //    serv_addr.sin_port = htons(port);
 
-    if (bind(listenfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0){
-       error("ERROR on binding");
-    }
-    listen(listenfd, 5);
+ //    if (bind(listenfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0){
+ //       error("ERROR on binding");
+ //    }
+ //    listen(listenfd, 5);
 
-	//open up the log file, and set it to append (so we don't overwrite anything).
 	logfile = fopen(PROXY_LOG,"a");
-	printf("Attempting to process requests in port: %d\n\n", port);
+	printf("Attempting to process requests in port: [%d]\n\n", port);
 
 	while(1)
 	{			
@@ -96,18 +101,18 @@ int main(int argc, char ** argv) {
 		if (connfd < 0){
 			error("Error with client accepting socket\n");
 		}
-		printf("Attempting to process request...\n");
+		printf("Attempting to process GET request...\n");
 		// close(listenfd);
-		process_request(connfd, &clientaddr);
+		// process_request(connfd, &clientaddr);
 
 		/* errors?? why... come back later? */
-		// if (fork() == 0) {
-		// 	close(listenfd);
-		// 	process_request(connfd, &clientaddr);
-		// }
-		// else{
-		// 	close(connfd);
-		// }
+		if (fork() == 0) {
+			// close(listenfd);
+			process_request(connfd, &clientaddr);
+		}
+		else{
+			close(connfd);
+		}
 	}
 
 	fclose(logfile);
@@ -122,7 +127,6 @@ void process_request(int connfd, struct sockaddr_in* clientaddr) {
 	char *rest_of_request; 
 	int request_len;
 	int i,n; 
-
 	char hostname[MAXLINE]; 
 	char pathname[MAXLINE];
 	int port;
@@ -130,7 +134,6 @@ void process_request(int connfd, struct sockaddr_in* clientaddr) {
 	char log_entry[MAXLINE];
 
 	rio_t rio;
-
 	char buf[MAXLINE];
 
 	request = (char*)malloc(MAXLINE);
@@ -139,7 +142,7 @@ void process_request(int connfd, struct sockaddr_in* clientaddr) {
 	Rio_readinitb(&rio, connfd);
 	while(1) {
 		if((n = rio_readlineb(&rio, buf, MAXLINE)) <= 0) {
-			printf("process_request: client issued a bad request (1).\n");
+			printf("Client attempted a bad request... Skipping this request.\n");
 			close(connfd);
 			free(request);
 			return;
@@ -147,17 +150,17 @@ void process_request(int connfd, struct sockaddr_in* clientaddr) {
 		strcat(request, buf);
 		request_len += n;
 
-		if((strcmp(buf, "\r\n") == 0) || strcmp(buf, "\r\n\r\n") == 0){
+		if((strcmp(buf, "\r\n") == 0)){
 			break;
 		}
 	}
-
 	if(strncmp(request, "GET ", strlen("get "))) {
-		printf("process_request: Received non-GET request\n");
+		printf("Received non-GET request... skipping this request.\n");
 		close(connfd);
 		free(request);
 		return;
 	}
+	printf("%s\n", request);
 	request_uri = request + 4;
 	request_uri_end = NULL;
 	for(i = 0; i < request_len; ++i) {
@@ -169,10 +172,16 @@ void process_request(int connfd, struct sockaddr_in* clientaddr) {
 	}
 
 	rest_of_request = request_uri_end + strlen("HTTP/1.0\r\n") + 1;
+
 	parse_uri(request_uri, hostname, pathname, &port);
 
 	serverfd = open_clientfd(hostname, port);
 
+	// write(serverfd, request, strlen(request));
+	// write(serverfd, "GET /", strlen("GET /"));
+	// write(serverfd, pathname, strlen(pathname));
+	// write(serverfd, " HTTP/1.0\r\n", strlen(" HTTP/1.0\r\n"));
+	// write(serverfd, rest_of_request, strlen(rest_of_request));
 	rio_writen(serverfd, "GET /", strlen("GET /"));
 	rio_writen(serverfd, pathname, strlen(pathname));
 	rio_writen(serverfd, " HTTP/1.0\r\n", strlen(" HTTP/1.0\r\n"));
@@ -181,7 +190,7 @@ void process_request(int connfd, struct sockaddr_in* clientaddr) {
 	Rio_readinitb(&rio, serverfd);
 	int response_len = 0;
 
-	while((n = rio_readn(serverfd, buf, MAXLINE)) > 0) {
+	while((n = recv(serverfd, buf, MAXLINE, 0)) > 0) {
 		response_len += n;
 		rio_writen(connfd, buf, n);
 		bzero(buf, MAXLINE);
@@ -328,6 +337,54 @@ int open_clientfd(char *hostname, int port)
     if (connect(clientfd, (SA *) &serveraddr, sizeof(serveraddr)) < 0)
 	return -1;
     return clientfd;
+}
+
+int open_listenfd(char *port) 
+{
+    struct addrinfo hints, *listp, *p;
+    int listenfd, rc, optval=1;
+
+    /* Get a list of potential server addresses */
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_socktype = SOCK_STREAM;             /* Accept connections */
+    hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG; /* ... on any IP address */
+    hints.ai_flags |= AI_NUMERICSERV;            /* ... using port number */
+    if ((rc = getaddrinfo(NULL, port, &hints, &listp)) != 0) {
+        fprintf(stderr, "getaddrinfo failed (port %s): %s\n", port, gai_strerror(rc));
+        return -2;
+    }
+
+    /* Walk the list for one that we can bind to */
+    for (p = listp; p; p = p->ai_next) {
+        /* Create a socket descriptor */
+        if ((listenfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0) 
+            continue;  /* Socket failed, try the next */
+
+        /* Eliminates "Address already in use" error from bind */
+        setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR,    //line:netp:csapp:setsockopt
+                   (const void *)&optval , sizeof(int));
+
+        /* Bind the descriptor to the address */
+        if (bind(listenfd, p->ai_addr, p->ai_addrlen) == 0)
+            break; /* Success */
+        if (close(listenfd) < 0) { /* Bind failed, try the next */
+            fprintf(stderr, "open_listenfd close failed: %s\n", strerror(errno));
+            return -1;
+        }
+    }
+
+
+    /* Clean up */
+    freeaddrinfo(listp);
+    if (!p) /* No address worked */
+        return -1;
+
+    /* Make it a listening socket ready to accept connection requests */
+    if (listen(listenfd, 1024) < 0) {
+        close(listenfd);
+	return -1;
+    }
+    return listenfd;
 }
 
 int Open_clientfd(char *hostname, int port) 
