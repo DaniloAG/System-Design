@@ -55,14 +55,16 @@ int main(int argc, char **argv)
     int request_count = 0;    /* Number of requests received so far */
     /* $end solution */
     /* Check arguments */
-    while(1)
-    {
-        printf("unix> ");
-        fgets(tempString, 100, stdin);
-        if (strcmp(tempString, "\n") == 0){
-            continue;
-        }
-    }
+    // while(1)
+    // {
+    //     printf("unix> ");
+    //     fgets(tempString, 100, stdin);
+    //     if (strcmp(tempString, "\n") == 0){
+    //         continue;
+    //     }
+    // }
+
+
     if (argc != 2) {
 	fprintf(stderr, "Usage: %s <port number>\n", argv[0]);
 	exit(0);
@@ -77,7 +79,7 @@ int main(int argc, char **argv)
 
     /* Create a listening descriptor */
     port = atoi(argv[1]);
-    listenfd = Open_listenfd(port);
+    listenfd = Open_listenfd(argv[1]);
 
     /* Inititialize */
     log_file = Fopen(PROXY_LOG, "a");

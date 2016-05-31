@@ -711,6 +711,7 @@ void Pthread_once(pthread_once_t *once_control, void (*init_function)()) {
 
 void Sem_init(sem_t *sem, int pshared, unsigned int value) 
 {
+    printf("asdf\n");
     if (sem_init(sem, pshared, value) < 0)
 	unix_error("Sem_init error");
 }
