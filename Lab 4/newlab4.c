@@ -115,30 +115,26 @@ int main(int argc, char ** argv) {
 } 
 
 void process_request(int connfd, struct sockaddr_in* clientaddr) {	
-	int serverfd; //we'll open a connection to the server to read from.
-	char *request; //the http request we pull from the client
-	char *request_uri; //pointer to the start of the URI from the request
-	char *request_uri_end; //end of the URI
-	char *rest_of_request; //after URI
-	int request_len; //size of the request
-	int response_len; //size of the response (from the server)
-	int i,n; //some counting/iteration vars
-	int realloc_factor; //We'll use this to increase the size of the request/response buf
+	int serverfd; 
+	char *request; 
+	char *request_uri; 
+	char *request_uri_end; 
+	char *rest_of_request; 
+	int request_len;
+	int i,n; 
 
-	char hostname[MAXLINE]; //we'll extract the hostname from the URI
-	char pathname[MAXLINE]; //extract pathname from URI
-	int port; //port number from URI -- defaults to 80
+	char hostname[MAXLINE]; 
+	char pathname[MAXLINE];
+	int port;
 
-	char log_entry[MAXLINE]; //log entry
+	char log_entry[MAXLINE];
 
-	rio_t rio; //robust input/output
+	rio_t rio;
 
 	char buf[MAXLINE];
 
-	//We'll read the request one line at a time.
 	request = (char*)malloc(MAXLINE);
 	request[0] = '\0';
-	realloc_factor = 2;
 	request_len = 0;
 	Rio_readinitb(&rio, connfd);
 	while(1) {
@@ -182,9 +178,8 @@ void process_request(int connfd, struct sockaddr_in* clientaddr) {
 	rio_writen(serverfd, " HTTP/1.0\r\n", strlen(" HTTP/1.0\r\n"));
 	rio_writen(serverfd, rest_of_request, strlen(rest_of_request));
 
-	//initialize reader to read from server
 	Rio_readinitb(&rio, serverfd);
-	response_len = 0;
+	int response_len = 0;
 
 	while((n = rio_readn(serverfd, buf, MAXLINE)) > 0) {
 		response_len += n;
