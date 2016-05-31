@@ -212,7 +212,7 @@ void get_hostname(char* uri, char* hostname){
 	char *begin;
 	char *end;
 
-	if (strcmp(uri,"htpp://") !=0){
+	iif(strncasecmp(uri, "http://", 7) !=0){
 		hostname[0]= '\0';
 		return;
 	}
@@ -224,6 +224,7 @@ void get_hostname(char* uri, char* hostname){
 	if (end ==  NULL){
 		hostname[strlen(begin)]= '\0';
 	} else{
+		strcpy(hostname,begin);
 		hostname[end-begin] = '\0';
 			}
 
