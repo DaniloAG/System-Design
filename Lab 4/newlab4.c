@@ -1,344 +1,73 @@
-/*
-	Gonzalez, Danilo: 28017253
-	Orozco, Jonathan: 66888405
-	Almazan, Adrian: 19437291
-*/
-	
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
-#include <signal.h>
-#include <sys/time.h>
-#include <errno.h>
-#include <sys/socket.h>
-#include <netdb.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <string.h>
+#include <netdb.h> 
+#include <errno.h>
+/* const */
+int RESPONSE_BUFFER_SIZE = 5000;
+int GET_BUFFER_SIZE = 2000;
+int HOST_BUFFER_SIZE = 100;
 
-#define PROXY_LOG "proxy.log"
 FILE* logfile;
 
-void process_request(int connfd, struct sockaddr_in* clientaddr);
-int parse_uri(char* uri, char* hostname, char* pathname, int* port);
-void format_log_entry(char* log_entry, struct sockaddr_in* sockaddr, char* uri, int size);
-int checkArguments(int argc);
-int checkPortNumber(char* number);
-int checkSocket();
-void sigchld_handler(int sig);
-// int extract_url(char* request, char* url);
-int extract_hostname(char* request, char* hostname);
-// int extract_port(struct request *request, char *port_char);
-// int extract_pathname();
+/* request struct */
+struct request {
+    int port;
+    char *host;
+    char *get;
+    struct sockaddr_in *socket;
+};
 
-/* Functions declared below were taken from csapp.h */
-#define	MAXLINE	 8192  
-#define MAXBUF   8192  
+/* handler functions */
+void server_loop(int sockfd);
+void handle_request(int client_sockfd);
+int foward_response(struct request *request, int client_sockfd);
 
-typedef struct {
-    int rio_fd;                
-    int rio_cnt;               
-    char *rio_bufptr;          
-    char rio_buf[8192];
-} rio_t;
+/* factory functions */
+struct request *request_factory();
+void free_request(struct request **request);
+struct sockaddr_in *sockaddr_factory(int port);
+struct sockaddr_in *sockaddr_server_factory(struct request *request);
+void free_sockaddr(struct sockaddr_in **sockaddr);
+int socket_factory();
 
-typedef struct sockaddr SA;
+/* helper functions */
+int break_loop_chunked(const char *buffer, int buffer_size);
+int is_get_request(struct request *request);
+int extract_hostname(struct request *request);
+int extract_url(struct request *request);
+int extract_port(struct request *request, char *port_char);
+int get_content_length(const char *response);
+int get_http_status(const char *response);
+void validate_argc(int argc);
+int validate_port(const char *port);
 
-void error(const char *msg);
-void unix_error(char *msg);
-void dns_error(char *msg);
-void rio_readinitb(rio_t *rp, int fd);
-void Rio_readinitb(rio_t *rp, int fd);
-ssize_t rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen);
-ssize_t rio_read(rio_t *rp, char *usrbuf, size_t n);
-ssize_t rio_writen(int fd, void *usrbuf, size_t n);
-ssize_t Rio_readn(int fd, void *ptr, size_t nbytes);
-ssize_t rio_readn(int fd, void *usrbuf, size_t n);
-int open_clientfd(char *hostname, int port);
-int Open_clientfd(char *hostname, int port);
-int open_listenfd(char *port);
-/* Functions declared above were taken from csapp.h */
+/* error function */
+void error(const char *message);
+void format_log_entry(char* log_entry, struct sockaddr_in* sockaddr, char* uri, int response_len);
 
-int main(int argc, char ** argv) {
-	int listenfd;
-	int port;
-	int clientlen;
-	int connfd;
-	struct sockaddr_in clientaddr;
-	struct sockaddr_in serv_addr, cli_addr;
-
-	if (checkArguments(argc) < 1){
-       exit(1);
-    }
-    if ((port = checkPortNumber(argv[1])) < 0){
-       exit(1);
-    }
-    if ((listenfd = open_listenfd(argv[1])) < 0){
-        exit(1);
-    }
-
-    signal(SIGCHLD, sigchld_handler);
-	signal(SIGPIPE,SIG_IGN);
-
-	// bzero((char *) &serv_addr, sizeof(serv_addr));
- //    serv_addr.sin_family = AF_INET;
- //    serv_addr.sin_addr.s_addr = INADDR_ANY;
- //    serv_addr.sin_port = htons(port);
-
- //    if (bind(listenfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0){
- //       error("ERROR on binding");
- //    }
- //    listen(listenfd, 5);
-
-	logfile = fopen(PROXY_LOG,"a");
-	printf("Attempting to process requests in port: [%d]\n\n", port);
-
-	while(1)
-	{			
-		clientlen = sizeof(clientaddr);
-		printf("Attempting to connect... Please wait.\n");
-		connfd = accept(listenfd, (SA *)&clientaddr, (socklen_t *)&clientlen);
-		if (connfd < 0){
-			error("Error with client accepting socket\n");
-		}
-		printf("Attempting to process GET request...\n");
-		// close(listenfd);
-		// process_request(connfd, &clientaddr);
-
-		/* errors?? why... come back later? */
-		if (fork() == 0) {
-			// close(listenfd);
-			process_request(connfd, &clientaddr);
-		}
-		else{
-			close(connfd);
-		}
-	}
-
-	fclose(logfile);
-	exit(0);
-} 
-
-void process_request(int connfd, struct sockaddr_in* clientaddr) {	
-	int serverfd; 
-	char *request; 
-	char *request_uri; 
-	char *request_uri_end; 
-	char *rest_of_request; 
-	int request_len;
-	int i,n; 
-	char hostname[MAXLINE]; 
-	char pathname[MAXLINE];
-	int port;
-
-	char log_entry[MAXLINE];
-
-	rio_t rio;
-	char buf[MAXLINE];
-
-	request = (char*)malloc(MAXLINE);
-	request[0] = '\0';
-	request_len = 0;
-	Rio_readinitb(&rio, connfd);
-	while(1) {
-		if((n = rio_readlineb(&rio, buf, MAXLINE)) <= 0) {
-			printf("Client attempted a bad request... Skipping this request.\n");
-			close(connfd);
-			free(request);
-			return;
-		}
-		strcat(request, buf);
-		request_len += n;
-
-		if((strcmp(buf, "\r\n") == 0)){
-			break;
-		}
-	}
-	if(strncmp(request, "GET ", strlen("get "))) {
-		printf("Received non-GET request... skipping this request.\n");
-		close(connfd);
-		free(request);
-		return;
-	}
-	printf("%s\n", request);
-	request_uri = request + 4;
-	request_uri_end = NULL;
-	for(i = 0; i < request_len; ++i) {
-		if(request_uri[i] == ' ') {
-			request_uri[i] = '\0';
-			request_uri_end = &request_uri[i]; 
-			break;
-		}
-	}
-
-	rest_of_request = request_uri_end + strlen("HTTP/1.0\r\n") + 1;
-
-	parse_uri(request_uri, hostname, pathname, &port);
-
-	serverfd = open_clientfd(hostname, port);
-
-	// write(serverfd, request, strlen(request));
-	// write(serverfd, "GET /", strlen("GET /"));
-	// write(serverfd, pathname, strlen(pathname));
-	// write(serverfd, " HTTP/1.0\r\n", strlen(" HTTP/1.0\r\n"));
-	// write(serverfd, rest_of_request, strlen(rest_of_request));
-	rio_writen(serverfd, "GET /", strlen("GET /"));
-	rio_writen(serverfd, pathname, strlen(pathname));
-	rio_writen(serverfd, " HTTP/1.0\r\n", strlen(" HTTP/1.0\r\n"));
-	rio_writen(serverfd, rest_of_request, strlen(rest_of_request));
-
-	Rio_readinitb(&rio, serverfd);
-	int response_len = 0;
-
-	while((n = recv(serverfd, buf, MAXLINE, 0)) > 0) {
-		response_len += n;
-		rio_writen(connfd, buf, n);
-		bzero(buf, MAXLINE);
-	}
-
-	format_log_entry(log_entry, clientaddr, request_uri, response_len);
-	fprintf(logfile, "%s\n", log_entry);
-	fflush(logfile);
-
-	close(connfd);
-	close(serverfd);
-	free(request);
-}
-
-int parse_uri(char* uri, char* hostname, char* pathname, int* port) {
-	char *hostbegin;
-	char *hostend;
-	char *pathbegin;
-	int len;
-
-	if(strncasecmp(uri, "http://", 7) !=0) {
-		hostname[0] = '\0';
-		return -1;
-	}
-
-	hostbegin = uri + 7;
-	hostend = strpbrk(hostbegin, " :/\r\n");
-
-	len = (hostend == NULL ? strlen(hostbegin) : hostend - hostbegin);
-	strncpy(hostname, hostbegin, len); 
-
-	hostname[len] = '\0';
-
-	*port = 80;
-	if (hostend != NULL && *hostend == ':') {
-		*port = atoi(hostend + 1);
-	}
-
-	pathbegin = strchr(hostbegin, '/');
-	if(pathbegin == NULL) {
-		pathname[0] = '\0';
-	} else {
-		pathbegin++;
-		strcpy(pathname, pathbegin);
-	}
-	return 0;
-}
-
-void format_log_entry(char* log_entry, struct sockaddr_in* sockaddr, char* uri, int response_len){
-	time_t now;
-	char time_str[MAXLINE];
-	unsigned long host;
-	unsigned char a, b, c, d;
-
-	now = time(NULL);
-	strftime(time_str, MAXLINE, "%a %d %b %Y %H:%M:%S %Z", localtime(&now));
-
-	host = ntohl(sockaddr->sin_addr.s_addr);
-	a = host >> 24;
-	b = (host >> 16) & 0xff;
-	c = (host >> 8) & 0xff;
-	d = host & 0xff; 
-	sprintf(log_entry, "%s: %d.%d.%d.%d %s %d", time_str, a, b, c, d, uri, response_len);
-}
-
-
-void sigchld_handler(int sig){
+/**
+ * handles signals from children
+ * @param sig {int}
+ */
+void sigchld_handler(int sig) {
     int status;
+    printf("running sigchld_handler[%d]\n", sig);
     while (waitpid((pid_t)(-1), &status, WNOHANG) > 0) {
-        ;
+        printf("reaped[%d]\n", status);
     }
 }
 
-int checkArguments(int argc){
-    if (argc == 2){
-        return 1;
-    }
-    else if (argc == 1){
-        error("Port number not specified.\n");
-        return -1;
-    }
-    else{
-        error("Too many arguments!\n");
-        return -1;
-    }
-}
-
-int checkPortNumber(char* number){
-    int charToNumber = atoi(number);
-    if (charToNumber < 1024 || charToNumber > 65536){
-        error("Port is out of range!\n");
-        return -1;
-    }
-    else{
-        return charToNumber;
-    }
-}
-
-int checkSocket(){
-  int socketChecker = socket(AF_INET, SOCK_STREAM, 0);
-  if (socketChecker < 0) {
-    error("Error with the socket!\n");
-  }
-  return socketChecker;
-}
-
-/* Functions provided by Professor Harris. They're located within csapp.c */
-void error(const char *msg){
-    perror(msg);
-    exit(1);
-}
-
-void unix_error(char *msg) /* Unix-style error */
-{
-    fprintf(stderr, "%s: %s\n", msg, strerror(errno));
-    exit(0);
-}
-
-void dns_error(char *msg) /* DNS-style error */
-{
-    fprintf(stderr, "%s: DNS error %d\n", msg, h_errno);
-    exit(0);
-}
-
-int open_clientfd(char *hostname, int port) 
-{
-    int clientfd;
-    struct hostent *hp;
-    struct sockaddr_in serveraddr;
-
-    if ((clientfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-	return -1; /* Check errno for cause of error */
-
-    /* Fill in the server's IP address and port */
-    if ((hp = gethostbyname(hostname)) == NULL)
-	return -2; /* Check h_errno for cause of error */
-    bzero((char *) &serveraddr, sizeof(serveraddr));
-    serveraddr.sin_family = AF_INET;
-    bcopy((char *)hp->h_addr_list[0], 
-	  (char *)&serveraddr.sin_addr.s_addr, hp->h_length);
-    serveraddr.sin_port = htons(port);
-
-    /* Establish a connection with the server */
-    if (connect(clientfd, (SA *) &serveraddr, sizeof(serveraddr)) < 0)
-	return -1;
-    return clientfd;
-}
-
+/**
+ * taken from csapp.c
+ * @param  port {char *}
+ * @return      {int}
+ */
 int open_listenfd(char *port) 
 {
     struct addrinfo hints, *listp, *p;
@@ -382,132 +111,438 @@ int open_listenfd(char *port)
     /* Make it a listening socket ready to accept connection requests */
     if (listen(listenfd, 1024) < 0) {
         close(listenfd);
-	return -1;
+        return -1;
     }
     return listenfd;
 }
 
-int Open_clientfd(char *hostname, int port) 
-{
-    int rc;
+int main(int argc, char **argv) {
+    int sockfd;
+    int port;
+    struct sockaddr_in *server_address;
 
-    if ((rc = open_clientfd(hostname, port)) < 0) {
-	if (rc == -1)
-	    unix_error("Open_clientfd Unix error");
-	else        
-	    dns_error("Open_clientfd DNS error");
-    }
-    return rc;
-}
+    signal(SIGCHLD, sigchld_handler);
+    signal(SIGPIPE,SIG_IGN);
 
-void rio_readinitb(rio_t *rp, int fd) 
-{
-    rp->rio_fd = fd;  
-    rp->rio_cnt = 0;  
-    rp->rio_bufptr = rp->rio_buf;
-}
+    /* validate argument count */
+    validate_argc(argc);
 
-void Rio_readinitb(rio_t *rp, int fd)
-{
-    rio_readinitb(rp, fd);
-} 
+    port = validate_port(argv[1]);
 
-ssize_t rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen) 
-{
-    int n, rc;
-    char c, *bufp = usrbuf;
+    sockfd = open_listenfd(argv[1]);
+    printf("Listening to port %d\n", port);
 
-    for (n = 1; n < maxlen; n++) { 
-        if ((rc = rio_read(rp, &c, 1)) == 1) {
-	    *bufp++ = c;
-	    if (c == '\n') {
-                n++;
-     		break;
-            }
-	} else if (rc == 0) {
-	    if (n == 1)
-		return 0; /* EOF, no data read */
-	    else
-		break;    /* EOF, some data was read */
-	} else
-	    return -1;	  /* Error */
-    }
-    *bufp = 0;
-    return n-1;
-}
+    /* infinite loop */
+    struct sockaddr_in client_address;
+    int client_sockfd;
+    socklen_t client_len = sizeof(client_address);
 
-ssize_t rio_read(rio_t *rp, char *usrbuf, size_t n)
-{
-    int cnt;
+    while(1) {
+        /* accept the incoming socket */
+        client_sockfd = accept(sockfd, (struct sockaddr *) &client_address, &client_len);
 
-    while (rp->rio_cnt <= 0) {  /* Refill if buf is empty */
-	rp->rio_cnt = read(rp->rio_fd, rp->rio_buf, 
-			   sizeof(rp->rio_buf));
-	if (rp->rio_cnt < 0) {
-	    if (errno != EINTR) /* Interrupted by sig handler return */
-		return -1;
-	}
-	else if (rp->rio_cnt == 0)  /* EOF */
-	    return 0;
-	else 
-	    rp->rio_bufptr = rp->rio_buf; /* Reset buffer ptr */
+        /* check if socket has any errors, if so it exits(1) */
+        if (client_sockfd < 0)
+            error("Error with client accepting socket\n");
+
+        /* fork the process and let the child handle the request */
+        if (fork() == 0) {
+            /* child */
+            close(sockfd);
+            handle_request(client_sockfd);
+        } else {
+            /* parent */
+            close(client_sockfd);
+        }
     }
 
-    /* Copy min(n, rp->rio_cnt) bytes from internal buf to user buf */
-    cnt = n;          
-    if (rp->rio_cnt < n)   
-	cnt = rp->rio_cnt;
-    memcpy(usrbuf, rp->rio_bufptr, cnt);
-    rp->rio_bufptr += cnt;
-    rp->rio_cnt -= cnt;
-    return cnt;
+    /* free server address */
+    free_sockaddr(&server_address);
+
+    return 0;
 }
 
-ssize_t rio_writen(int fd, void *usrbuf, size_t n) 
-{
-    size_t nleft = n;
-    ssize_t nwritten;
-    char *bufp = usrbuf;
+void handle_request(int client_sockfd) {
+    int size;
+    struct request *request = request_factory();
+    char *request_ptr = request->get;
 
-    while (nleft > 0) {
-	if ((nwritten = write(fd, bufp, nleft)) <= 0) {
-	    if (errno == EINTR)  /* Interrupted by sig handler return */
-		nwritten = 0;    /* and call write() again */
-	    else
-		return -1;       /* errno set by write() */
-	}
-	nleft -= nwritten;
-	bufp += nwritten;
+    /* reads request until \r\n\r\n */
+    while((size = read(client_sockfd, request_ptr, GET_BUFFER_SIZE)) > 0) {
+        request_ptr += size;
+        if (break_loop_chunked(request->get, strlen(request->get)))
+            break;
     }
-    return n;
-}
 
-ssize_t Rio_readn(int fd, void *ptr, size_t nbytes) 
-{
-    ssize_t n;
-  
-    if ((n = rio_readn(fd, ptr, nbytes)) < 0)
-	unix_error("Rio_readn error");
-    return n;
-}
+    if (size < 0)
+        error("Error reading from socket \n");
 
-ssize_t rio_readn(int fd, void *usrbuf, size_t n) 
-{
-    size_t nleft = n;
-    ssize_t nread;
-    char *bufp = usrbuf;
+    if (is_get_request(request)) {
+        printf("=== REQUEST ===\n");
+        printf("%s\n", request->get);
 
-    while (nleft > 0) {
-	if ((nread = read(fd, bufp, nleft)) < 0) {
-	    if (errno == EINTR) /* Interrupted by sig handler return */
-		nread = 0;      /* and call read() again */
-	    else
-		return -1;      /* errno set by read() */ 
-	} 
-	else if (nread == 0)
-	    break;              /* EOF */
-	nleft -= nread;
-	bufp += nread;
+        if ( ! extract_hostname(request))
+            extract_url(request);
+
+        printf("[%s][%d]\n", request->host, request->port);
+        foward_response(request, client_sockfd);
+    } else {
+        printf("-- WAS NOT GET REQUEST --");
     }
-    return (n - nleft);         /* return >= 0 */
+
+    close(client_sockfd);
+
+    free_request(&request);
+
+    /* child exits */
+    exit(0);
+}
+
+/**
+ * sends request over to the server and fowards the 
+ * servers response to the client
+ * @param  request       {struct request *}
+ * @param  client_sockfd {sock file descriptor}
+ * @return               {boolean}
+ */
+int foward_response(struct request *request, int client_sockfd) {
+    int server_sockfd, n, buffer_size, http_status;
+    /* content-length: dual purpose, flag and acutal count*/
+    int content_length = 0;
+    /* first is a usngined int use as boolean flag for first read */
+    unsigned char first = 1;
+    unsigned char kill = 0;
+    struct sockaddr_in *server_address;
+    char buffer[RESPONSE_BUFFER_SIZE];
+
+    server_sockfd = socket_factory();
+    server_address = sockaddr_server_factory(request);
+
+    if (connect(server_sockfd, (struct sockaddr *) server_address, sizeof(struct sockaddr_in)) < 0)
+        error("Error connecting to server\n");
+
+    printf("%s[][][][][][][]\n", request->get);
+    n = write(server_sockfd, request->get, strlen(request->get));
+
+    if (n < 0)
+        error("Error writing to socket");
+
+    /* read from web server */
+    while((buffer_size = read(server_sockfd, buffer, RESPONSE_BUFFER_SIZE)) > 0) {
+        
+        /* if buffer length is less than or equal to zero exit */
+        if (buffer_size <= 0)
+            break;
+
+        /* first loop and if http status is not 200 ie (404, 304, etc) then set to kill */
+        //if (first && (http_status = get_http_status(buffer) != 200))
+        //    kill = 1;
+
+        /* checks if content legnth is set, and adds buffer */
+        if (first && (content_length = get_content_length(buffer)) != 0) {
+            printf("- --------- CONTENT LENGTH -----------");
+            content_length += strstr(buffer, "\r\n\r\n") - buffer;
+        }
+
+        /* disable first flag*/
+        first = 0;
+
+        printf(" size [%d]\n", buffer_size);
+        printf("writing: client\n");
+        /* write to clients browser */
+        write(client_sockfd, buffer, RESPONSE_BUFFER_SIZE);
+        printf("%s\n", buffer);
+
+        /* if kill flag is set or content-length is 0 or we get \r\n\r\n we exit */
+        if (kill || (content_length && (content_length -= buffer_size) <= 0) || (break_loop_chunked(buffer, buffer_size))) {
+            printf("[[[[ KILLED ]]]]\n");
+            break;
+        }
+
+        bzero(buffer, RESPONSE_BUFFER_SIZE);
+
+    }
+
+    return close(server_sockfd);
+}
+
+int break_loop_chunked(const char *buffer, int buffer_size) {
+    return (strcmp(&buffer[buffer_size - 4], "\r\n\r\n") == 0);
+}
+
+/**
+ * checks if request has a GET method
+ * @param  request {struct request *}
+ * @return         {boolean}
+ */
+int is_get_request(struct request *request) {
+    return (strstr(request->get, "GET") != 0);
+}
+
+/**
+ * request factory
+ * @return {struct request *}
+ */
+struct request *request_factory() {
+    struct request *request = calloc(1, sizeof(struct request));
+    request->port = 80;
+    request->get = calloc(GET_BUFFER_SIZE, sizeof(char));
+    request->host = calloc(HOST_BUFFER_SIZE, sizeof(char));
+    return request;
+}
+
+/**
+ * free's the request pointer and its variables
+ * @param request {struct request **}
+ */
+void free_request(struct request **request) {
+    free((*request)->get);
+    (*request)->get = NULL;
+    free((*request)->host);
+    (*request)->host = NULL;
+    free(*request);
+    (*request) = NULL;
+}
+
+/**
+ * creates a new socketaddr struct and returns
+ * the pointer
+ * 
+ * @param  port {int}
+ * @return      {struct sockaddr_in *}
+ */
+struct sockaddr_in *sockaddr_factory(int port) {
+    struct sockaddr_in *sockaddr = calloc(1, sizeof(struct sockaddr_in));
+    sockaddr->sin_family = AF_INET;
+    sockaddr->sin_addr.s_addr = INADDR_ANY;
+    sockaddr->sin_port = htons(port);
+    return sockaddr;
+}
+
+/**
+ * frees sockaddr struct
+ * @param sockaddr {free_sockaddr}
+ */
+void free_sockaddr(struct sockaddr_in **sockaddr) {
+    free(*sockaddr);
+    (*sockaddr) = NULL;
+}
+
+/**
+ * creates a new socket
+ * @return {int} socket file descriptor
+ */
+int socket_factory() {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    
+    if (sock < 0)
+        error("Error opening socket\n");
+
+    return sock;
+}
+
+/**
+ * creates a new sockaddr_in struct
+ * @param  request {struct request *}
+ * @return         {struct sockaddr_in *}
+ */
+struct sockaddr_in *sockaddr_server_factory(struct request *request) {
+    struct hostent *server;
+    struct sockaddr_in *server_addr = calloc(1, sizeof(struct sockaddr_in));
+
+    server = gethostbyname(request->host);
+
+    /* check if host is reachable */
+    if (server == NULL) {
+        fprintf(stderr, "Error, no such host\n");
+        free_request(&request);
+        exit(0);
+    }
+
+    /* set up sockaddr_in struct */
+    server_addr->sin_family = AF_INET;
+    server_addr->sin_port = htons(request->port);
+    memcpy(&(server_addr->sin_addr.s_addr), server->h_addr, server->h_length);
+
+    return server_addr;
+}
+
+/**
+ * extracts hostname from url
+ * @param  request {struct request *}
+ * @return         {int} boolean
+ */
+int extract_hostname(struct request *request) {
+    char *start;
+    char *end;
+    char *port;
+
+    start = strstr(request->get, "Host: ");
+    
+    /* if start is null, host is not set. */
+    if (start == NULL)
+        return 0;
+
+    /* move 6 chars over to get domain name */
+    start += 6;
+
+    /* find the first \r\n after `Host: ` */
+    end = strstr(start, "\r\n");
+
+    if (end == NULL) {
+        printf("End char went wrong\n");
+        return 0;
+    }
+    /* copy from end of Host: - to begining of \r\n */
+    strncpy(request->host, start, end - start);
+
+    /* looking to see if port is set */
+    port = strstr(request->host, ":");
+    
+    /* if port is found, extract port to request object */
+    if (port != NULL)
+        extract_port(request, port);
+
+    /* typically we calloc everything to make it zero */
+    /* but incase one slips by */
+    request->host[end - start] = '\0';
+
+    return 1;
+}
+
+/**
+ * extracts the url from GET request
+ * @param  request {struct request *}
+ * @return         {int} boolean
+ */
+int extract_url(struct request *request) {
+    int offset = 7;
+    char *start;
+    char *end;
+
+    if ((start = strstr(request->get, "http://")) == NULL) {
+        if ((start = strstr(request->get, "https://")) == NULL) {
+            /* your fucked */
+            return 0;
+        }
+        offset = 8;
+    }
+
+    start += offset;
+
+    end = strstr(start, "/");
+    
+    /* if end is null this is some werid malformed char */
+    if (end == NULL)
+        return 0;
+
+    /* sanity checks */
+    if (start > end) {
+        printf("Abort trap 6\n");
+        return 0;
+    }
+
+    strncpy(request->get, start, end - start);
+
+    /* typically we calloc everything but just in case one gets by */
+    request->get[end - start] = '\0';
+
+    return 1;
+}
+
+/**
+ * extracts a port if a portnumber is preset
+ * @param  request   {struct request *}
+ * @param  port_char {char *} port
+ * @return           {int} boolean
+ */
+int extract_port(struct request *request, char *port_char) {
+    printf("extracting port\n");
+    char *port = port_char;
+    char *temp_port = calloc(6, sizeof(char));
+    
+    *port_char = '\0';
+    /* move pointer over by 1; */
+    port++;
+
+    strcpy(temp_port, port);
+    request->port = atoi(temp_port);
+    if (request->port == 0)
+        request->port = 80;
+    free(temp_port);
+    return 1;
+}
+
+/**
+ * looks for the content length and returns a number if found
+ * 
+ * @param  response {const char *}
+ * @return          {int} boolean
+ */
+int get_content_length(const char* response) {
+    char *start;
+    char *end;
+    char length[25];
+    int len;
+
+    char content_len[] = "Content-Length: ";
+
+    start = strstr(response, content_len);
+
+    if (start == NULL)
+        return 0;
+
+    start += strlen(content_len);
+
+    end = strstr(start, "\r\n");
+
+    if (end == NULL)
+        return 0;
+
+    strncpy(length, start, end - start);
+    length[end - start] = '\0';
+    len = atoi(length);
+    return len;
+}
+
+/**
+ * gets the response http response
+ * @param  response {const char *}
+ * @return          {int boolean}
+ */
+int get_http_status(const char *response) {
+    char status[4];
+    strncpy(status, response+9, 3);
+    status[3] = '\0';
+
+    printf("status [%s]\n", status);
+    return atoi(status);
+}
+
+/**
+ * validates arg count
+ * @param argc {int}
+ */
+void validate_argc(int argc) {
+    if (argc == 1)
+        error("PORT is not specified\n");
+
+    if (argc > 2)
+        error("hmm too many args?\n");
+}
+
+
+int validate_port(const char *port) {
+    int port_number = atoi(port);
+
+    if (1024 > port_number || port_number > 65536)
+        error("Port is out of range\n");
+
+    return port_number;
+}
+
+
+void error(const char *message) {
+    printf("%s\n",message);
+    exit(1);
 }
