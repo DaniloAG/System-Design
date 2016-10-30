@@ -1,13 +1,19 @@
+/* 
+ * Simple, 32-bit and 64-bit clean allocator based on implicit free
+ * lists, first-fit placement, and boundary tag coalescing, as described
+ * in the CS:APP3e text. Blocks must be aligned to doubleword (8 byte) 
+ * boundaries. Minimum block size is 16 bytes. 
+ */
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/mman.h>
 #include <string.h>
-#include <errno.h>
+#include <stdlib.h>
 
+#include "mm.h"
+#include "memlib.h"
 
-/* ----------------------------------- HEADERS FROM BOOK -----------------------------------*/
-
+/*
+ * If NEXT_FIT defined use next fit search, else use first-fit search 
+ */
 #define NEXT_FITx
 
 /* $begin mallocmacros */
@@ -38,8 +44,6 @@
 #define PREV_BLKP(bp)  ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE))) //line:vm:mm:prevblkp
 /* $end mallocmacros */
 
-#define MAX_HEAP (20*(1<<20))
-
 /* Global variables */
 static char *heap_listp = 0;  /* Pointer to first block */  
 #ifdef NEXT_FIT
@@ -54,238 +58,12 @@ static void *coalesce(void *bp);
 static void printblock(void *bp); 
 static void checkheap(int verbose);
 static void checkblock(void *bp);
-             
-void *mem_sbrk(int incr);
-
-void mem_deinit(void);
-void mem_reset_brk(void); 
-void *mem_heap_lo(void);
-void *mem_heap_hi(void);
-size_t mem_heapsize(void);
-size_t mem_pagesize(void);
-
-int mm_init(void);
-void *mm_malloc (size_t size);
-void mm_free (void *ptr);
-void mem_init(void);
-/* $end mallocinterface */
-
-void *mm_realloc(void *ptr, size_t size);
-void *mm_calloc (size_t nmemb, size_t size);
-void mm_checkheap(int verbose);
-
-static char *mem_heap;     /* Points to first byte of heap */ 
-static char *mem_brk;      /* Points to last byte of heap plus 1 */
-static char *mem_max_addr; /* Max legal heap addr plus 1*/ 
 
 
-/* ----------------------------------------------------------------------- */
-
-void blocklistFunction();
-void *allocateFunction(size_t size, int);
-void freeFunction(int num);
-void printheapFunction(int block_number, int bytes);
-void writeheapFunction(int block_number, char* letter, int number);
-int inputToCommandOne(char* first);
-void inputToCommandTwice(char* first, char* second);
-void inputToCommandThree(char* first, char* second, char* third);
-void inputToCommandFourth(char* first, char* second, char* third, char* fourth);
-
-
-static char *block_heap[100];
-static int number_counter[100];
-static int numberCounterGlobal = 0;
-static int block_num = 0;
-
-int main(){
-    mem_init();
-    mm_init();
-	char delimiters[] = "\t \n";
-	while (1){
-		char tempString[100];
-		char* commandVariable;
-		char* secondaryVariable = "";
-		char* thirdVariable = "";
-		char* fourthVariable = "";
-		int numberCounter = 1;
-
-		char* tempPointer;
-
-		printf("> ");
-		fgets(tempString, 100, stdin);
-		if (strcmp(tempString, "\n") == 0){
-			continue;
-		}
-		tempString[strlen(tempString) - 1] = '\0';
-		tempPointer = strtok(tempString, delimiters);
-		commandVariable = tempPointer;
-		while (tempPointer != NULL){
-			tempPointer = strtok(NULL, delimiters);
-			if (tempPointer == NULL){
-				break;
-			}
-			if (numberCounter == 1){
-				secondaryVariable = tempPointer;
-				numberCounter++;
-			}
-			else if (numberCounter == 2){
-				thirdVariable = tempPointer;
-				numberCounter++;
-			}
-			else if (numberCounter == 3){
-				fourthVariable = tempPointer;
-				numberCounter++;
-			}
-		}
-
-
-		if (numberCounter == 1){
-			int toQuit = inputToCommandOne(commandVariable);
-			if (toQuit == 1){
-				break;
-			}
-			else if (toQuit == 0){
-				blocklistFunction();
-			}
-			else{
-				printf("%s is not a valid command!\n", commandVariable);
-			}
-		}
-		else if (numberCounter == 2){
-			inputToCommandTwice(commandVariable, secondaryVariable);
-		}
-		else if (numberCounter == 3){
-			inputToCommandThree(commandVariable, secondaryVariable, thirdVariable);
-		}
-		else if (numberCounter == 4){
-			inputToCommandFourth(commandVariable, secondaryVariable, thirdVariable, fourthVariable);
-		}
-		else{
-			continue;
-		}
-	}
-}
-
-
-/* ----------------------------------- HELPER FUNCTIONS WE IMPLEMENTED -----------------------------------*/
-
-void blocklistFunction(){
-    if (block_heap[0] == NULL){
-        return;
-    }
-    int i = 0;
-    int counter = 0;
-    void* bp;
-    printf("Size\tAlloc\tStart\tEnd\n");
-    for (bp = block_heap[i]; i < block_num;  bp = NEXT_BLKP(bp)){
-        if (GET_ALLOC(HDRP(block_heap[i]))==1){
-            printf("%d\tyes\t0x%x\t0x%x\n", number_counter[counter], HDRP(block_heap[i]) ,FTRP(block_heap[i]) + 4);
-        }else{
-            printf("%d\tno\t0x%x\t0x%x\n", number_counter[counter], HDRP(block_heap[i]) ,FTRP(block_heap[i]) + 4);
-           
-        // if (GET_ALLOC(HDRP(block_heap[i]))==1){
-        //     printf("%d\tyes\t0x%x\t0x%x\n", GET_SIZE(HDRP(block_heap[i])), HDRP(block_heap[i]) ,FTRP(block_heap[i]) + 4);
-        // }else{
-        //     printf("%d\tno\t0x%x\t0x%x\n", GET_SIZE(HDRP(block_heap[i])), HDRP(block_heap[i]) ,FTRP(block_heap[i]) + 4);
-           
-        }
-        counter++;
-        i++;
-    }
-	
-}
-
-void *allocateFunction(size_t size, int block_number){
-	// printf("allocate!\n");
-    void *block_ptr;
-    block_ptr = mm_malloc(size);
-
-    printf("%d\n", block_number + 1);
-    number_counter[numberCounterGlobal] = size;
-    numberCounterGlobal++;
-    return block_ptr;
-
-}
-
-void freeFunction(int num){
-	mm_free(block_heap[num - 1]);
-}
-
-void printheapFunction(int block_number, int bytes){
-	void *bp = block_heap[block_number - 1];
-	int i;
-    for (i = 0; i < bytes; i++){
-        printf("%c", GET(bp));
-        bp++;
-    }
-    printf("\n");
-}
-
-void writeheapFunction(int block_number, char* letter, int number){
-    // printf("writing %s\n ",letter);
-    char letterToUse = *letter;
-    void *bp = block_heap[block_number - 1];
-    int i;
-    for (i = 0; i< number;  i++){
-        PUT(bp, letterToUse);
-        bp++;
-    }
-}
-
-int inputToCommandOne(char* first){
-	if (strcmp(first, "quit") == 0){
-		return 1;
-	}
-	else if (strcmp(first, "blocklist") == 0){
-		return 0;
-	}
-	else{
-		return -1;
-	}
-}
-
-void inputToCommandTwice(char* first, char* second){
-	if (strcmp(first, "allocate") == 0){
-		int number = atoi(second);
-		block_heap[block_num]= allocateFunction(number, block_num);
-		block_num++;
-	}
-	else if (strcmp(first, "free") == 0){
-        int number = atoi(second);
-		freeFunction(number);
-
-	}
-	else{
-		printf("%s is not a valid command!\n", first);
-	}
-}
-
-void inputToCommandThree(char* first, char* second, char* third){
-	if (strcmp(first, "printheap") == 0){
-        int number = atoi(second);
-        int number_2 = atoi(third);
-		printheapFunction(number, number_2);
-	}
-	else{
-		printf("%s is not a valid command!\n", first);
-	}
-}
-
-void inputToCommandFourth(char* first, char* second, char* third, char* fourth){
-	if (strcmp(first, "writeheap") == 0){
-        int number = atoi(second);
-        int number_2= atoi(fourth);
-		writeheapFunction(number, third, number_2);
-	}
-	else{
-		printf("%s is not a valid command!\n", first);
-	}
-}
-
-/* -----------------------------------------------------------------------------------------*/
-
-/* ----------------------------------- FUNCTIONS FROM BOOK ---------------------------------*/
-
+/* 
+ * mm_init - Initialize the memory manager 
+ */
+/* $begin mminit */
 int mm_init(void) 
 {
     /* Create the initial empty heap */
@@ -556,6 +334,7 @@ static void *find_fit(size_t asize)
     return NULL; /* No fit */
 #endif
 }
+/* $end mmfirstfit */
 
 static void printblock(void *bp) 
 {
@@ -611,70 +390,3 @@ void checkheap(int verbose)
         printf("Bad epilogue header\n");
 }
 
-/* 
- * mem_init - Initialize the memory system model
- */
-void mem_init()
-{
-    mem_heap = (char *)malloc(MAX_HEAP);
-    mem_brk = (char *)mem_heap;               
-    mem_max_addr = (char *)(mem_heap + MAX_HEAP); 
-}
-
-/* 
- * mem_sbrk - Simple model of the sbrk function. Extends the heap 
- *    by incr bytes and returns the start address of the new area. In
- *    this model, the heap cannot be shrunk.
- */
-void *mem_sbrk(int incr) 
-{
-    char *old_brk = mem_brk;
-
-    if ( (incr < 0) || ((mem_brk + incr) > mem_max_addr)) {
-	errno = ENOMEM;
-	fprintf(stderr, "ERROR: mem_sbrk failed. Ran out of memory...\n");
-	return (void *)-1;
-    }
-    mem_brk += incr;
-    return (void *)old_brk;
-}
-/* $end memlib */
-
-/* 
- * mem_deinit - free the storage used by the memory system model
- */
-void mem_deinit(void)
-{
-}
-
-/*
- * mem_reset_brk - reset the simulated brk pointer to make an empty heap
- */
-void mem_reset_brk()
-{
-    mem_brk = (char *)mem_heap;
-}
-
-/*
- * mem_heap_lo - return address of the first heap byte
- */
-void *mem_heap_lo()
-{
-    return (void *)mem_heap;
-}
-
-/* 
- * mem_heap_hi - return address of last heap byte
- */
-void *mem_heap_hi()
-{
-    return (void *)(mem_brk - 1);
-}
-
-/*
- * mem_heapsize() - returns the heap size in bytes
- */
-size_t mem_heapsize() 
-{
-    return (size_t)((void *)mem_brk - (void *)mem_heap);
-}

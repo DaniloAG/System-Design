@@ -28,13 +28,13 @@ void eval(char *cmdline);
 int parseline(char *buf, char **argv);
 int builtin_command(char **argv);
 void reapCommands();
-void reaper();
 
 int globalCounter = 0;
 pid_t toReap[MAXARGS];
 
 int main(){
 	char cmdline[MAXLINE]; 
+
 	while (1) {
 		printf("prompt> ");
  		fgets(cmdline, MAXLINE, stdin);
@@ -67,30 +67,20 @@ void eval(char *cmdline){
  		}
  		else{
  			if (bg){
- 				// printf("lmao");
  				toReap[globalCounter] = pid;
 				globalCounter++;
  			}
  		}
  	/* Parent waits for foreground job to terminate */
- 		if (bg){
- 			printf("%d %s", pid, cmdline);
- 			signal(SIGCHLD, reaper);
- 		}
- 		else{
+ 		if (!bg) {
  			int status;
- 			pid_t wpid;
- 			wpid = waitpid(pid, &status, 0);
- 			while (!WIFEXITED(status)){
- 				wpid = waitpid(pid, &status, 0);
+ 			if (waitpid(pid, &status, 0) < 0){
+ 				fprintf(stderr, "%s: %s\n", "waitfg: waitpid error", strerror(errno));
+    			exit(0);
  			}
- 			// int status;
- 			// if (waitpid(pid, &status, 0) < 0){
- 			// 	printf("done processing\n");
- 			// 	fprintf(stderr, "%s: %s\n", "waitfg: waitpid error", strerror(errno));
-    // 			exit(0);
- 			// }
  		}
+ 		else
+ 			printf("%d %s", pid, cmdline);
  	}
  	return;
  }
@@ -113,67 +103,33 @@ void eval(char *cmdline){
  /* parseline - Parse the command line and build the argv array */
 int parseline(char *buf, char **argv)
 {
-	char delim[] = "\t \n"; 					/* Points to first space delimiter */
-	int argc = 0; 						/* Number of args */
+	char *delim; 					/* Points to first space delimiter */
+	int argc; 						/* Number of args */
 	int bg; 						/* Background job? */
-	char* toUse;
-	char* finalString = malloc(sizeof(char) * MAXARGS);
 
-	toUse = strtok(buf, delim);
-	while (toUse != NULL){
-		argv[argc++] = toUse;
-		strcpy(finalString, toUse);
-		toUse = strtok(NULL, delim);
-	}
-	argv[argc] = NULL;
-	
-	if (argc == 0){
+ 	buf[strlen(buf)-1] = ' ' ; 		/* Replace trailing ’\n’ with space */
+ 	while (*buf && (*buf == ' ' )) 	/* Ignore leading spaces */
+ 		buf++;
+
+ 	/* Build the argv list */
+ 	argc = 0;
+ 	while ((delim = strchr(buf, ' '))) {
+ 		argv[argc++] = buf;
+ 		*delim = '\0';
+ 		buf = delim + 1;
+ 		while (*buf && (*buf == ' ')) 		/* Ignore spaces */
+ 			buf++;
+ 	}
+ 	argv[argc] = NULL;
+
+	if (argc == 0)						 /* Ignore blank line */
 		return 1;
-	}
 
-	bg = (*argv[argc - 1] == '&' || finalString[strlen(finalString) - 1] == '&');
-	if (bg != 0){
-		if (*argv[argc - 1] == '&'){
-			argv[--argc] = NULL;
-		}
-		else if (finalString[strlen(finalString) - 1] == '&'){
-			finalString[strlen(finalString) - 1] = '\0';
-			argv[argc - 1] = finalString;
-		}
-	}
-
- // 	buf[strlen(buf)-1] = ' ' ; 		/* Replace trailing ’\n’ with space */
- // 	while ((*buf && (*buf == ' ' )) || (*buf && (*buf == '\t'))) 	/* Ignore leading spaces */
- // 		buf++;
-
- // 	/* Build the argv list */
- // 	argc = 0;
- // 	while ((delim = strchr(buf, ' '))) {
- // 		argv[argc++] = buf;
- // 		*delim = '\0';
- // 		buf = delim + 1;
- // 		while ((*buf && (*buf == ' ')) || (*buf && (*buf == '\t'))) 		/* Ignore spaces */
- // 			buf++;
- // 	}
- // 	argv[argc] = NULL;
-
-	// if (argc == 0)						 /* Ignore blank line */
-	// 	return 1;
-
- // 	/* Should the job run in the background? */
-	// if ((bg = (*argv[argc-1] == '&')) != 0)
- // 		argv[--argc] = NULL;
-
+ 	/* Should the job run in the background? */
+	if ((bg = (*argv[argc-1] == '&')) != 0)
+ 		argv[--argc] = NULL;
 
 	return bg;
-}
-
-void reaper(){
-	pid_t process;
-	int status;
-	while ((process = waitpid(-1, &status, WNOHANG)) > 0){
-		
-	}
 }
 
 void reapCommands(){
@@ -182,14 +138,14 @@ void reapCommands(){
 	int temp;
 	int i;
 	for (i = 0; i < globalCounter; i++){
-		// printf("Killing process %d\n", toReap[i]);
+		printf("Killing process %d\n", toReap[i]);
 		kill(toReap[i], SIGINT);
 	}
 	for (i = 0; i < globalCounter; i++){
 		pid_t wpid = wait(&temp);
-		// if (WIFEXITED(temp)) 
-		// 	printf("Child %d terminated %d\n", wpid, WEXITSTATUS(temp));
-		// else 
-		// 	printf("Child terminated abnormally\n");
+		if (WIFEXITED(temp)) 
+			printf("Child %d terminated %d\n", wpid, WEXITSTATUS(temp));
+		else 
+			printf("Child terminated abnormally\n");
 	}
 }

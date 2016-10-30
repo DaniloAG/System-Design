@@ -1,0 +1,5 @@
+Joe Smith	10 Main St.	555-1212
+Jane Winter	11 Main St.	555-2323
+June Spring	12 Main St.	+1-49-101-555-1212
+Jonathan Orozco	33 Main St.	0-2323
+Derek Zimmer	55 Main St.	22-2323

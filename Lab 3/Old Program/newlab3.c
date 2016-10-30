@@ -86,21 +86,7 @@ void insert(int size) {
 		// bp = bp + 1 + tmp_size
 		// check end, end = heap+400; if bp > end
 		// printf("my size[%d], s:[%d] allocated:[%d]\n", size, get_size(bp), is_allocated(bp));
-		if(size<get_size(bp) && is_allocated(bp) ==0 ){
-			int old_size = get_size(bp)-size-1;
-			allocate(bp,size);
-			printf("%d\n", ++blockCount);
-
-			block_array[block_number++]= bp;
-			bp += get_size(bp) + 1 ;
-			allocate(bp, old_size);
-			block_array[block_number]=bp;
-			free_block(block_number);
-
-			return;
-		}
 		bp += get_size(bp) + 1 ;
-		
 	}
 	allocate(bp,size);
 	block_array[block_number++]= bp;
@@ -129,7 +115,7 @@ void blocklist(){
 	printf("Size\tAlloc\tStart\t\tEnd\n");
 	while(!((get_size(bp) == 0) && is_allocated(bp) ==0)){
 
-		 printf("%d\t%s\t%p\t%p\n", get_size(bp)+1, is_allocated(bp)? "yes":"no", bp, bp+get_size(bp));
+		 printf("%d\t%s\t%p\t%p\n", get_size(bp) + 1, is_allocated(bp)? "yes":"no", bp, bp+get_size(bp));
 		 bp += get_size(bp)+1;
 	}
 
